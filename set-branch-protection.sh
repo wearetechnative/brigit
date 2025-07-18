@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Script to set branch protection for GitHub repositories based on ghbranchprotection.json configuration
 # Usage: ./set-branch-protection.sh [-f file_path]
@@ -98,17 +98,17 @@ if [ -n "$REPOS_FILE" ]; then
         apply_branch_protection "$org" "$repo"
     done < "$REPOS_FILE"
 else
-    # No file provided, process all repositories from config file
-    jq -r 'keys[]' "$CONFIG_FILE" | while read -r org; do
-        # Skip default key if it exists
-        if [ "$org" == "default" ]; then
-            continue
-        fi
-        
-        jq -r --arg org "$org" '.[$org] | keys[]' "$CONFIG_FILE" | while read -r repo; do
-            apply_branch_protection "$org" "$repo"
-        done
-    done
+    # No file provided, prompt for organization and repository
+    read -p "Enter organization name: " org
+    read -p "Enter repository name: " repo
+    
+    # Validate input
+    if [ -z "$org" ] || [ -z "$repo" ]; then
+        echo "Error: Organization and repository names cannot be empty."
+        exit 1
+    fi
+    
+    apply_branch_protection "$org" "$repo"
 fi
 
 echo "Branch protection setup completed."
