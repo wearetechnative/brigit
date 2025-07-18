@@ -9,17 +9,22 @@ ORGANIZATION=""
 
 # Function to display usage information
 usage() {
-    echo "Usage: $0 [-o organization]"
+    echo "Usage: $0 [-o organization] [-r repository]"
     echo "  -o organization  GitHub organization to check repositories for"
+    echo "  -r repository    Specific repository to check (requires -o)"
     echo "  -h               Display this help message"
     exit 1
 }
 
 # Parse command line arguments
-while getopts "o:h" opt; do
+REPOSITORY=""
+while getopts "o:r:h" opt; do
     case ${opt} in
         o)
             ORGANIZATION=$OPTARG
+            ;;
+        r)
+            REPOSITORY=$OPTARG
             ;;
         h)
             usage
@@ -63,6 +68,24 @@ if [ -z "$ORGANIZATION" ]; then
         echo "Error: Organization name cannot be empty."
         exit 1
     fi
+    
+    # If no repository specified, ask if user wants to check a specific repo
+    if [ -z "$REPOSITORY" ]; then
+        read -p "Do you want to check a specific repository? (y/N): " check_specific
+        if [[ "$check_specific" =~ ^[Yy] ]]; then
+            read -p "Enter repository name: " REPOSITORY
+            if [ -z "$REPOSITORY" ]; then
+                echo "Error: Repository name cannot be empty."
+                exit 1
+            fi
+        fi
+    fi
+fi
+
+# Validate repository if provided with organization
+if [ -n "$REPOSITORY" ] && [ -z "$ORGANIZATION" ]; then
+    echo "Error: Organization (-o) must be specified when checking a specific repository."
+    exit 1
 fi
 
 # Get expected branch protection configuration
@@ -137,21 +160,34 @@ check_branch_protection() {
     fi
 }
 
-# Get list of repositories in the organization
-echo "Fetching repositories for organization: $ORGANIZATION..."
-repos=$(gh repo list "$ORGANIZATION" --json name --limit 100 | jq -r '.[].name')
-
-if [ -z "$repos" ]; then
-    echo "No repositories found for organization $ORGANIZATION or you don't have access."
-    exit 1
-fi
-
 # Initialize array to store repositories with errors
 declare -a error_repos
 
-# Check branch protection for each repository
-repo_count=$(echo "$repos" | wc -l | tr -d ' ')
-echo "Found $repo_count repositories. Checking branch protection..."
+# Check a single repository or get list of repositories in the organization
+if [ -n "$REPOSITORY" ]; then
+    # Check if repository exists
+    if ! gh repo view "$ORGANIZATION/$REPOSITORY" &>/dev/null; then
+        echo "Error: Repository $ORGANIZATION/$REPOSITORY not found or you don't have access."
+        exit 1
+    fi
+    
+    echo "Checking branch protection for repository: $ORGANIZATION/$REPOSITORY"
+    repos="$REPOSITORY"
+    repo_count=1
+else
+    # Get list of repositories in the organization
+    echo "Fetching repositories for organization: $ORGANIZATION..."
+    repos=$(gh repo list "$ORGANIZATION" --json name --limit 100 | jq -r '.[].name')
+
+    if [ -z "$repos" ]; then
+        echo "No repositories found for organization $ORGANIZATION or you don't have access."
+        exit 1
+    fi
+
+    # Count repositories
+    repo_count=$(echo "$repos" | wc -l | tr -d ' ')
+    echo "Found $repo_count repositories. Checking branch protection..."
+fi
 echo
 printf "%-40s %s\n" "REPOSITORY" "STATUS"
 printf "%-40s %s\n" "----------" "------"
