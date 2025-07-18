@@ -61,19 +61,34 @@ apply_branch_protection() {
     
     echo "Setting branch protection for $org/$repo..."
     
-    # Get protection settings from config file
-    local protection_config=$(jq -c --arg org "$org" --arg repo "$repo" '.[$org][$repo] // .default' "$CONFIG_FILE")
+    # Get protection settings from config file - use default configuration
+    local protection_config=$(jq -c '.default' "$CONFIG_FILE")
     
-    # If no specific config and no default, use empty config
+    # If no default config, exit with error
     if [ "$protection_config" == "null" ]; then
-        echo "No protection configuration found for $org/$repo and no default configuration."
+        echo "No default protection configuration found in $CONFIG_FILE."
         return 1
     fi
     
     # Apply branch protection using GitHub API via gh CLI
-    echo "$protection_config" | gh api --method PUT "/repos/$org/$repo/branches/main/protection" --input - \
-        && echo "✅ Branch protection applied successfully for $org/$repo" \
-        || echo "❌ Failed to apply branch protection for $org/$repo"
+    response=$(echo "$protection_config" | gh api --method PUT "/repos/$org/$repo/branches/main/protection" --input - 2>&1)
+    exit_code=$?
+    
+    if [ $exit_code -eq 0 ]; then
+        echo "✅ Branch protection applied successfully for $org/$repo"
+    else
+        echo "❌ Failed to apply branch protection for $org/$repo"
+        
+        # Check for specific error messages
+        if echo "$response" | grep -q "Upgrade to GitHub Pro"; then
+            echo "   Error: Branch protection requires GitHub Pro for private repositories."
+            echo "   Options: 1) Make the repository public, or 2) Upgrade to GitHub Pro"
+        elif echo "$response" | grep -q "Not Found"; then
+            echo "   Error: Repository not found or you don't have sufficient permissions."
+        else
+            echo "   Error details: $response"
+        fi
+    fi
 }
 
 # Process repositories
