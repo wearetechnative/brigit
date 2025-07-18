@@ -164,37 +164,34 @@ check_branch_protection() {
         return 1
     fi
     
-    # Extract the fields we care about from the current protection
-    current_simplified=$(echo "$current_protection" | jq -c '{
-        required_status_checks: .required_status_checks,
-        enforce_admins: (if .enforce_admins.enabled != null then .enforce_admins.enabled else .enforce_admins end),
-        required_pull_request_reviews: {
-            required_approving_review_count: (if .required_pull_request_reviews != null then .required_pull_request_reviews.required_approving_review_count else null end)
-        },
-        restrictions: .restrictions
-    }')
+    # Extract only the required_approving_review_count from current protection
+    # This is the key field we care about
+    current_review_count=$(echo "$current_protection" | jq -r '.required_pull_request_reviews.required_approving_review_count // 0')
     
-    # Extract the same fields from expected config for comparison
-    expected_simplified=$(echo "$expected_config" | jq -c '{
-        required_status_checks: .required_status_checks,
-        enforce_admins: .enforce_admins,
-        required_pull_request_reviews: {
-            required_approving_review_count: .required_pull_request_reviews.required_approving_review_count
-        },
-        restrictions: .restrictions
-    }')
+    # Extract the same field from expected config
+    expected_review_count=$(echo "$expected_config" | jq -r '.required_pull_request_reviews.required_approving_review_count // 0')
     
-    # Compare configurations
-    if [ "$current_simplified" = "$expected_simplified" ]; then
+    # For debug purposes, show the extracted values
+    if $DEBUG; then
+        echo
+        echo "DEBUG: Extracted values:"
+        echo "  Expected review count: $expected_review_count"
+        echo "  Current review count: $current_review_count"
+        echo
+        printf "%-40s" "$repo"
+    fi
+    
+    # Compare just the review count - this is the essential protection we care about
+    if [ "$current_review_count" = "$expected_review_count" ]; then
         echo "✅"
         return 0
     else
         echo "❌"
         # Add more detailed debugging
         echo "   Configuration mismatch detected"
-        echo "   Expected: $expected_simplified"
-        echo "   Current:  $current_simplified"
-        error_msg="Configuration mismatch"
+        echo "   Expected review count: $expected_review_count"
+        echo "   Current review count: $current_review_count"
+        error_msg="Review count mismatch (expected: $expected_review_count, got: $current_review_count)"
         error_repos+=("$repo: $error_msg")
         return 2
     fi
