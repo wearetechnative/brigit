@@ -76,6 +76,15 @@ apply_branch_protection() {
     
     if [ $exit_code -eq 0 ]; then
         echo "✅ Branch protection applied successfully for $org/$repo"
+        echo "   Configuration applied: $(echo "$protection_config" | jq -c '.')"
+        
+        # Verify the protection was applied correctly
+        verify_response=$(gh api "/repos/$org/$repo/branches/main/protection" 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            echo "   Verification successful: protection is enabled"
+        else
+            echo "   ⚠️ Warning: Could not verify protection status"
+        fi
     else
         echo "❌ Failed to apply branch protection for $org/$repo"
         

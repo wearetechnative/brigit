@@ -120,7 +120,7 @@ check_branch_protection() {
     printf "%-40s" "$repo"
     
     # Get current branch protection settings in background and capture PID
-    current_protection=$(gh api "/repos/$org/$repo/branches/main/protection" 2>/dev/null) &
+    current_protection=$(gh api "/repos/$org/$repo/branches/main/protection" 2>&1) &
     local pid=$!
     spinner $pid
     wait $pid
@@ -130,14 +130,36 @@ check_branch_protection() {
     if $DEBUG; then
         echo
         echo "DEBUG: Raw API response for $org/$repo:"
-        echo "$current_protection" | jq '.'
+        if [ $exit_code -eq 0 ]; then
+            echo "$current_protection" | jq '.' 2>/dev/null || echo "$current_protection"
+        else
+            echo "Error: $current_protection"
+        fi
         echo
         printf "%-40s" "$repo"
     fi
     
-    if [ $exit_code -ne 0 ]; then
+    # Check if the response contains an error message about branch protection not being enabled
+    if [ $exit_code -ne 0 ] || echo "$current_protection" | grep -q "Branch not protected"; then
         echo "❌"
-        error_msg="No protection enabled, insufficient permissions, or repository doesn't exist"
+        error_msg="No branch protection enabled"
+        error_repos+=("$repo: $error_msg")
+        
+        # If debug mode is enabled, show more details
+        if $DEBUG; then
+            echo
+            echo "   No branch protection is enabled for this repository"
+            echo "   Expected: $(echo "$expected_config" | jq '.')"
+            printf "%-40s" "$repo"
+        fi
+        
+        return 1
+    fi
+    
+    # Check if the response is valid JSON
+    if ! echo "$current_protection" | jq '.' &>/dev/null; then
+        echo "❌"
+        error_msg="Invalid response format or no branch protection"
         error_repos+=("$repo: $error_msg")
         return 1
     fi
@@ -147,7 +169,7 @@ check_branch_protection() {
         required_status_checks: .required_status_checks,
         enforce_admins: (if .enforce_admins.enabled != null then .enforce_admins.enabled else .enforce_admins end),
         required_pull_request_reviews: {
-            required_approving_review_count: .required_pull_request_reviews.required_approving_review_count
+            required_approving_review_count: (if .required_pull_request_reviews != null then .required_pull_request_reviews.required_approving_review_count else null end)
         },
         restrictions: .restrictions
     }')
