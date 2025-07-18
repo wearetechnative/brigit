@@ -1,0 +1,3 @@
+myorg:repo1
+myorg:repo2
+anotherorg:somerepo
