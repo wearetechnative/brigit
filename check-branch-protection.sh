@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 
-# Script to check branch protection for GitHub repositories against ghbranchprotection.json configuration
+# Script to check branch protection for GitHub repositories
 # Usage: ./check-branch-protection.sh [-o organization]
 
 # Default values
-CONFIG_FILE="ghbranchprotection.json"
 ORGANIZATION=""
 DEBUG=false
 
@@ -58,12 +57,6 @@ if ! gh auth status &> /dev/null; then
     exit 1
 fi
 
-# Check if config file exists
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "Error: Configuration file $CONFIG_FILE not found."
-    exit 1
-fi
-
 # If no organization provided, prompt for it
 if [ -z "$ORGANIZATION" ]; then
     read -p "Enter GitHub organization name: " ORGANIZATION
@@ -93,9 +86,6 @@ if [ -n "$REPOSITORY" ] && [ -z "$ORGANIZATION" ]; then
     exit 1
 fi
 
-# Get expected branch protection configuration
-expected_config=$(jq -c '.default' "$CONFIG_FILE")
-
 # Function for spinning cursor animation
 spinner() {
     local pid=$1
@@ -111,7 +101,7 @@ spinner() {
     printf "    \b\b\b\b"
 }
 
-# Function to check if branch protection matches expected configuration
+# Function to check if branch protection is properly configured
 check_branch_protection() {
     local org=$1
     local repo=$2
@@ -196,15 +186,6 @@ check_branch_protection() {
         fi
         
         error_repos+=("$repo: $error_msg")
-        
-        # If debug mode is enabled, show more details
-        if $DEBUG; then
-            echo
-            echo "   $error_msg"
-            echo "   Expected: $(echo "$expected_config" | jq '.')"
-            printf "%-40s" "$repo"
-        fi
-        
         return 1
     fi
     
@@ -225,47 +206,29 @@ check_branch_protection() {
     
     if [ "$has_protection" != "true" ]; then
         echo "❌"
-        error_msg="Branch protection is not properly configured"
+        error_msg="Branch protection is not properly configured (missing required pull request reviews)"
         error_repos+=("$repo: $error_msg")
-        
-        if $DEBUG; then
-            echo
-            echo "   Branch protection is missing required_pull_request_reviews"
-            echo "   Current protection: $(echo "$current_protection" | jq -c '.')"
-            printf "%-40s" "$repo"
-        fi
-        
         return 1
     fi
     
-    # Extract only the required_approving_review_count from current protection
-    # This is the key field we care about
+    # Check if required_approving_review_count is at least 1
     current_review_count=$(echo "$current_protection" | jq -r '.required_pull_request_reviews.required_approving_review_count // "0"')
-    
-    # Extract the same field from expected config
-    expected_review_count=$(echo "$expected_config" | jq -r '.required_pull_request_reviews.required_approving_review_count // "0"')
     
     # For debug purposes, show the extracted values
     if $DEBUG; then
         echo
-        echo "DEBUG: Extracted values:"
-        echo "  Expected review count: $expected_review_count"
-        echo "  Current review count: $current_review_count"
+        echo "DEBUG: Required approving review count: $current_review_count"
         echo
         printf "%-40s" "$repo"
     fi
     
-    # Compare just the review count - this is the essential protection we care about
-    if [ "$current_review_count" = "$expected_review_count" ]; then
+    # Check if review count is at least 1
+    if [ "$current_review_count" -ge 1 ]; then
         echo "✅"
         return 0
     else
         echo "❌"
-        # Add more detailed debugging
-        echo "   Configuration mismatch detected"
-        echo "   Expected review count: $expected_review_count"
-        echo "   Current review count: $current_review_count"
-        error_msg="Review count mismatch (expected: $expected_review_count, got: $current_review_count)"
+        error_msg="Branch protection requires at least 1 approval (current: $current_review_count)"
         error_repos+=("$repo: $error_msg")
         return 2
     fi
@@ -323,8 +286,8 @@ done
 # Print summary
 echo
 echo "Summary:"
-echo "- Repositories with matching branch protection: $matching_count"
-echo "- Repositories with non-matching branch protection: $non_matching_count"
+echo "- Repositories with proper branch protection: $matching_count"
+echo "- Repositories with improper branch protection: $non_matching_count"
 echo "- Repositories with errors (no protection or access issues): $error_count"
 echo "- Total repositories checked: $((matching_count + non_matching_count + error_count))"
 
