@@ -71,7 +71,15 @@ apply_branch_protection() {
     fi
     
     # Apply branch protection using GitHub API via gh CLI
-    response=$(echo "$protection_config" | gh api --method PUT "/repos/$org/$repo/branches/main/protection" --input - 2>&1)
+    # First, ensure the JSON is properly formatted with all required fields
+    local complete_config=$(echo "$protection_config" | jq '{
+        required_status_checks: .required_status_checks,
+        enforce_admins: .enforce_admins,
+        required_pull_request_reviews: .required_pull_request_reviews,
+        restrictions: .restrictions
+    }')
+    
+    response=$(echo "$complete_config" | gh api --method PUT "/repos/$org/$repo/branches/main/protection" --input - 2>&1)
     exit_code=$?
     
     if [ $exit_code -eq 0 ]; then

@@ -156,6 +156,14 @@ check_branch_protection() {
         return 1
     fi
     
+    # Check if the response is empty or null
+    if [ -z "$current_protection" ] || [ "$current_protection" = "null" ]; then
+        echo "❌"
+        error_msg="Empty or null response from GitHub API"
+        error_repos+=("$repo: $error_msg")
+        return 1
+    fi
+    
     # Check if the response is valid JSON
     if ! echo "$current_protection" | jq '.' &>/dev/null; then
         echo "❌"
@@ -166,10 +174,10 @@ check_branch_protection() {
     
     # Extract only the required_approving_review_count from current protection
     # This is the key field we care about
-    current_review_count=$(echo "$current_protection" | jq -r '.required_pull_request_reviews.required_approving_review_count // 0')
+    current_review_count=$(echo "$current_protection" | jq -r 'if .required_pull_request_reviews then .required_pull_request_reviews.required_approving_review_count else 0 end')
     
     # Extract the same field from expected config
-    expected_review_count=$(echo "$expected_config" | jq -r '.required_pull_request_reviews.required_approving_review_count // 0')
+    expected_review_count=$(echo "$expected_config" | jq -r 'if .required_pull_request_reviews then .required_pull_request_reviews.required_approving_review_count else 0 end')
     
     # For debug purposes, show the extracted values
     if $DEBUG; then
