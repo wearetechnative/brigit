@@ -68,20 +68,40 @@ fi
 # Get expected branch protection configuration
 expected_config=$(jq -c '.default' "$CONFIG_FILE")
 
+# Function for spinning cursor animation
+spinner() {
+    local pid=$1
+    local delay=0.1
+    local spinstr='|/-\'
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf " [%c]  " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
+}
+
 # Function to check if branch protection matches expected configuration
 check_branch_protection() {
     local org=$1
     local repo=$2
+    local error_msg=""
     
-    echo "Checking branch protection for $org/$repo..."
+    printf "%-40s" "$repo"
     
-    # Get current branch protection settings
-    current_protection=$(gh api "/repos/$org/$repo/branches/main/protection" 2>/dev/null)
+    # Get current branch protection settings in background and capture PID
+    current_protection=$(gh api "/repos/$org/$repo/branches/main/protection" 2>/dev/null) &
+    local pid=$!
+    spinner $pid
+    wait $pid
     exit_code=$?
     
     if [ $exit_code -ne 0 ]; then
-        echo "❌ Failed to get branch protection for $org/$repo"
-        echo "   This could be due to: no protection enabled, insufficient permissions, or repository doesn't exist"
+        echo "❌"
+        error_msg="No protection enabled, insufficient permissions, or repository doesn't exist"
+        error_repos+=("$repo: $error_msg")
         return 1
     fi
     
@@ -107,13 +127,13 @@ check_branch_protection() {
     
     # Compare configurations
     if [ "$current_simplified" = "$expected_simplified" ]; then
-        echo "✅ Branch protection for $org/$repo matches expected configuration"
+        echo "✅"
         return 0
     else
-        echo "❌ Branch protection for $org/$repo does NOT match expected configuration"
-        echo "   Expected: $expected_simplified"
-        echo "   Current:  $current_simplified"
-        return 1
+        echo "❌"
+        error_msg="Configuration mismatch - Expected: $expected_simplified, Current: $current_simplified"
+        error_repos+=("$repo: $error_msg")
+        return 2
     fi
 }
 
@@ -126,9 +146,15 @@ if [ -z "$repos" ]; then
     exit 1
 fi
 
+# Initialize array to store repositories with errors
+declare -a error_repos
+
 # Check branch protection for each repository
-echo "Found $(echo "$repos" | wc -l | tr -d ' ') repositories. Checking branch protection..."
+repo_count=$(echo "$repos" | wc -l | tr -d ' ')
+echo "Found $repo_count repositories. Checking branch protection..."
 echo
+printf "%-40s %s\n" "REPOSITORY" "STATUS"
+printf "%-40s %s\n" "----------" "------"
 
 matching_count=0
 non_matching_count=0
@@ -138,21 +164,31 @@ for repo in $repos; do
     if check_branch_protection "$ORGANIZATION" "$repo"; then
         matching_count=$((matching_count + 1))
     else
-        if [ $? -eq 1 ]; then
+        result=$?
+        if [ $result -eq 1 ]; then
             error_count=$((error_count + 1))
         else
             non_matching_count=$((non_matching_count + 1))
         fi
     fi
-    echo
 done
 
 # Print summary
+echo
 echo "Summary:"
 echo "- Repositories with matching branch protection: $matching_count"
 echo "- Repositories with non-matching branch protection: $non_matching_count"
 echo "- Repositories with errors (no protection or access issues): $error_count"
 echo "- Total repositories checked: $((matching_count + non_matching_count + error_count))"
+
+# Print repositories with errors
+if [ ${#error_repos[@]} -gt 0 ]; then
+    echo
+    echo "Repositories with issues:"
+    for error_repo in "${error_repos[@]}"; do
+        echo "- $error_repo"
+    done
+fi
 
 # Exit with non-zero status if any repositories don't match
 if [ $non_matching_count -gt 0 ]; then
