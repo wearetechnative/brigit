@@ -139,28 +139,42 @@ check_branch_protection() {
         printf "%-40s" "$repo"
     fi
     
-    # Check if the response contains an error message about branch protection not being enabled
-    if [ $exit_code -ne 0 ] || echo "$current_protection" | grep -q "Branch not protected"; then
+    # Check if the response contains an error message or is empty
+    if [ $exit_code -ne 0 ] || [ -z "$current_protection" ] || [ "$current_protection" = "null" ] || echo "$current_protection" | grep -q "Branch not protected"; then
         echo "❌"
-        error_msg="No branch protection enabled"
+        
+        # Try to get branch information to see if the branch exists
+        branch_info=$(gh api "/repos/$org/$repo/branches/main" 2>/dev/null)
+        branch_exists=$?
+        
+        if [ $branch_exists -ne 0 ]; then
+            error_msg="Branch 'main' does not exist"
+        else
+            error_msg="No branch protection enabled"
+            
+            # Try to enable basic branch protection
+            if $DEBUG; then
+                echo
+                echo "   Attempting to verify if repository exists and is accessible..."
+                repo_info=$(gh repo view "$org/$repo" --json name 2>/dev/null)
+                if [ $? -eq 0 ]; then
+                    echo "   Repository exists and is accessible"
+                else
+                    echo "   Repository may not exist or you don't have access"
+                fi
+            fi
+        fi
+        
         error_repos+=("$repo: $error_msg")
         
         # If debug mode is enabled, show more details
         if $DEBUG; then
             echo
-            echo "   No branch protection is enabled for this repository"
+            echo "   $error_msg"
             echo "   Expected: $(echo "$expected_config" | jq '.')"
             printf "%-40s" "$repo"
         fi
         
-        return 1
-    fi
-    
-    # Check if the response is empty or null
-    if [ -z "$current_protection" ] || [ "$current_protection" = "null" ]; then
-        echo "❌"
-        error_msg="Empty or null response from GitHub API"
-        error_repos+=("$repo: $error_msg")
         return 1
     fi
     
@@ -172,12 +186,30 @@ check_branch_protection() {
         return 1
     fi
     
+    # Check if branch protection is enabled by looking for required_pull_request_reviews
+    has_protection=$(echo "$current_protection" | jq 'has("required_pull_request_reviews")')
+    
+    if [ "$has_protection" != "true" ]; then
+        echo "❌"
+        error_msg="Branch protection is not properly configured"
+        error_repos+=("$repo: $error_msg")
+        
+        if $DEBUG; then
+            echo
+            echo "   Branch protection is missing required_pull_request_reviews"
+            echo "   Current protection: $(echo "$current_protection" | jq -c '.')"
+            printf "%-40s" "$repo"
+        fi
+        
+        return 1
+    fi
+    
     # Extract only the required_approving_review_count from current protection
     # This is the key field we care about
-    current_review_count=$(echo "$current_protection" | jq -r 'if .required_pull_request_reviews then .required_pull_request_reviews.required_approving_review_count else 0 end')
+    current_review_count=$(echo "$current_protection" | jq -r '.required_pull_request_reviews.required_approving_review_count // "0"')
     
     # Extract the same field from expected config
-    expected_review_count=$(echo "$expected_config" | jq -r 'if .required_pull_request_reviews then .required_pull_request_reviews.required_approving_review_count else 0 end')
+    expected_review_count=$(echo "$expected_config" | jq -r '.required_pull_request_reviews.required_approving_review_count // "0"')
     
     # For debug purposes, show the extracted values
     if $DEBUG; then

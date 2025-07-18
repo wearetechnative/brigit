@@ -70,15 +70,26 @@ apply_branch_protection() {
         return 1
     fi
     
+    # First check if the branch exists
+    if ! gh api "/repos/$org/$repo/branches/main" &>/dev/null; then
+        echo "❌ Branch 'main' does not exist in repository $org/$repo"
+        return 1
+    fi
+    
     # Apply branch protection using GitHub API via gh CLI
     # First, ensure the JSON is properly formatted with all required fields
     local complete_config=$(echo "$protection_config" | jq '{
         required_status_checks: .required_status_checks,
         enforce_admins: .enforce_admins,
-        required_pull_request_reviews: .required_pull_request_reviews,
+        required_pull_request_reviews: {
+            required_approving_review_count: (.required_pull_request_reviews.required_approving_review_count // 1),
+            dismiss_stale_reviews: (.required_pull_request_reviews.dismiss_stale_reviews // false),
+            require_code_owner_reviews: (.required_pull_request_reviews.require_code_owner_reviews // false)
+        },
         restrictions: .restrictions
     }')
     
+    echo "Applying configuration: $(echo "$complete_config" | jq -c '.')"
     response=$(echo "$complete_config" | gh api --method PUT "/repos/$org/$repo/branches/main/protection" --input - 2>&1)
     exit_code=$?
     
