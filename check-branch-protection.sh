@@ -120,11 +120,17 @@ check_branch_protection() {
     printf "%-40s" "$repo"
     
     # Get current branch protection settings in background and capture PID
-    current_protection=$(gh api "/repos/$org/$repo/branches/main/protection" 2>&1) &
+    current_protection=$(gh api "/repos/$org/$repo/branches/main/protection" 2>&1 || echo "ERROR: $?") &
     local pid=$!
     spinner $pid
     wait $pid
-    exit_code=$?
+    
+    # Check if the response contains an error
+    if [[ "$current_protection" == ERROR* ]]; then
+        exit_code=1
+    else
+        exit_code=0
+    fi
     
     # Show raw API response in debug mode
     if $DEBUG; then
@@ -140,7 +146,7 @@ check_branch_protection() {
     fi
     
     # Check if the response contains an error message or is empty
-    if [ $exit_code -ne 0 ] || [ -z "$current_protection" ] || [ "$current_protection" = "null" ] || echo "$current_protection" | grep -q "Branch not protected"; then
+    if [ $exit_code -ne 0 ] || [ -z "$current_protection" ] || [ "$current_protection" = "null" ] || echo "$current_protection" | grep -q "Branch not protected" || echo "$current_protection" | grep -q "Not Found"; then
         echo "❌"
         
         # Try to get branch information to see if the branch exists
@@ -152,13 +158,37 @@ check_branch_protection() {
         else
             error_msg="No branch protection enabled"
             
-            # Try to enable basic branch protection
+            # Try to verify with direct curl command if gh CLI is failing
             if $DEBUG; then
                 echo
                 echo "   Attempting to verify if repository exists and is accessible..."
                 repo_info=$(gh repo view "$org/$repo" --json name 2>/dev/null)
                 if [ $? -eq 0 ]; then
                     echo "   Repository exists and is accessible"
+                    
+                    # Try with curl as a fallback
+                    echo "   Attempting direct API call with curl..."
+                    token=$(gh auth token)
+                    if [ -n "$token" ]; then
+                        curl_response=$(curl -s -H "Authorization: token $token" \
+                            "https://api.github.com/repos/$org/$repo/branches/main/protection")
+                        if [ $? -eq 0 ] && [ -n "$curl_response" ] && [ "$curl_response" != "null" ]; then
+                            echo "   Curl API call successful:"
+                            echo "$curl_response" | jq '.'
+                            
+                            # Extract review count from curl response
+                            curl_review_count=$(echo "$curl_response" | jq -r '.required_pull_request_reviews.required_approving_review_count // "0"')
+                            if [ -n "$curl_review_count" ] && [ "$curl_review_count" != "null" ]; then
+                                echo "   Found review count via curl: $curl_review_count"
+                                current_protection="$curl_response"
+                                exit_code=0
+                                # Continue with normal processing
+                                return 0
+                            fi
+                        else
+                            echo "   Curl API call failed or returned empty response"
+                        fi
+                    fi
                 else
                     echo "   Repository may not exist or you don't have access"
                 fi
@@ -187,7 +217,11 @@ check_branch_protection() {
     fi
     
     # Check if branch protection is enabled by looking for required_pull_request_reviews
-    has_protection=$(echo "$current_protection" | jq 'has("required_pull_request_reviews")')
+    has_protection=$(echo "$current_protection" | jq 'has("required_pull_request_reviews")' 2>/dev/null || echo "false")
+    
+    if [ "$has_protection" != "true" ] && [ "$has_protection" != "false" ]; then
+        has_protection="false"
+    fi
     
     if [ "$has_protection" != "true" ]; then
         echo "❌"

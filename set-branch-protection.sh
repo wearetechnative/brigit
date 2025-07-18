@@ -99,10 +99,12 @@ apply_branch_protection() {
         
         # Verify the protection was applied correctly
         verify_response=$(gh api "/repos/$org/$repo/branches/main/protection" 2>/dev/null)
-        if [ $? -eq 0 ]; then
+        verify_exit=$?
+        if [ $verify_exit -eq 0 ]; then
             echo "   Verification successful: protection is enabled"
+            echo "   Protection details: $(echo "$verify_response" | jq -c '.required_pull_request_reviews')"
         else
-            echo "   ⚠️ Warning: Could not verify protection status"
+            echo "   ⚠️ Warning: Could not verify protection status (exit code: $verify_exit)"
         fi
     else
         echo "❌ Failed to apply branch protection for $org/$repo"
