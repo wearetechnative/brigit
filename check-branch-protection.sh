@@ -6,25 +6,30 @@
 # Default values
 CONFIG_FILE="ghbranchprotection.json"
 ORGANIZATION=""
+DEBUG=false
 
 # Function to display usage information
 usage() {
-    echo "Usage: $0 [-o organization] [-r repository]"
+    echo "Usage: $0 [-o organization] [-r repository] [-d]"
     echo "  -o organization  GitHub organization to check repositories for"
     echo "  -r repository    Specific repository to check (requires -o)"
+    echo "  -d               Enable debug mode (shows raw API responses)"
     echo "  -h               Display this help message"
     exit 1
 }
 
 # Parse command line arguments
 REPOSITORY=""
-while getopts "o:r:h" opt; do
+while getopts "o:r:hd" opt; do
     case ${opt} in
         o)
             ORGANIZATION=$OPTARG
             ;;
         r)
             REPOSITORY=$OPTARG
+            ;;
+        d)
+            DEBUG=true
             ;;
         h)
             usage
@@ -121,6 +126,15 @@ check_branch_protection() {
     wait $pid
     exit_code=$?
     
+    # Show raw API response in debug mode
+    if $DEBUG; then
+        echo
+        echo "DEBUG: Raw API response for $org/$repo:"
+        echo "$current_protection" | jq '.'
+        echo
+        printf "%-40s" "$repo"
+    fi
+    
     if [ $exit_code -ne 0 ]; then
         echo "❌"
         error_msg="No protection enabled, insufficient permissions, or repository doesn't exist"
@@ -131,7 +145,7 @@ check_branch_protection() {
     # Extract the fields we care about from the current protection
     current_simplified=$(echo "$current_protection" | jq -c '{
         required_status_checks: .required_status_checks,
-        enforce_admins: .enforce_admins.enabled,
+        enforce_admins: (if .enforce_admins.enabled != null then .enforce_admins.enabled else .enforce_admins end),
         required_pull_request_reviews: {
             required_approving_review_count: .required_pull_request_reviews.required_approving_review_count
         },
@@ -154,7 +168,11 @@ check_branch_protection() {
         return 0
     else
         echo "❌"
-        error_msg="Configuration mismatch - Expected: $expected_simplified, Current: $current_simplified"
+        # Add more detailed debugging
+        echo "   Configuration mismatch detected"
+        echo "   Expected: $expected_simplified"
+        echo "   Current:  $current_simplified"
+        error_msg="Configuration mismatch"
         error_repos+=("$repo: $error_msg")
         return 2
     fi
