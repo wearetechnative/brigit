@@ -1,7 +1,7 @@
 # brigit
 
 
-**B**ranch **I**ntegrity **G**uard for **Git** (the T also stands for **T**echNative)
+**B**ranch **I**ntegrity **G**uard for **Git**
 
 <img src="images/brigitlogo.png" style="width:200px" />
 
