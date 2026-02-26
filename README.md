@@ -1,6 +1,10 @@
 # brigit
 
+
 **B**ranch **I**ntegrity **G**uard for **Git** (the T also stands for **T**echNative)
+
+<img src="images/brigitlogo.png" style="width:200px" />
+
 
 CLI tool voor het beheren van GitHub branch protection rules.
 
