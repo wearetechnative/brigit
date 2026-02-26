@@ -8,9 +8,9 @@ CLI tool for managing GitHub branch protection rules.
 
 ## Requirements
 
-- `gh` - GitHub CLI (authenticated)
-- `jq` - JSON processor
-- `gum` - Terminal UI toolkit
+- [`gh`](https://cli.github.com/) - GitHub CLI (authenticated)
+- [`jq`](https://stedolan.github.io/jq/) - JSON processor
+- [`gum`](https://github.com/charmbracelet/gum) - Terminal UI toolkit
 
 ## GitHub Permissions
 
