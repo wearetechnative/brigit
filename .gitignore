@@ -16,4 +16,4 @@ repos-[0-9]*.txt
 # Optional: User's ignore list (uncomment to track in git) and repos list
 repos-ignore.txt
 repos.txt
-
+.**log
