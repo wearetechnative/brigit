@@ -42,6 +42,17 @@ check_prerequisites() {
     fi
 }
 
+check_repo_archive() {
+  local ghorg="$1"
+  local ghrepo="$2"
+  repo_archive_state=$(gh repo view ${ghorg}/${ghrepo} --json isArchived --jq '.isArchived')
+  if [ "$repo_archive_state" = "true" ]; then
+    return 0   # repo is archived
+  else
+    return 1   # repo is not archived
+  fi
+}
+
 # Print a table (uses gum in interactive mode, column otherwise)
 # Usage: print_table "COL1,COL2\nval1,val2"
 print_table() {
