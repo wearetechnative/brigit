@@ -1,3 +1,5 @@
-myorg:repo1
-myorg:repo2
-anotherorg:somerepo
+technative-mcs:zammad-reporting
+technative-mcs:MSA-report-IIT-Medux
+technative-mcs:mustad-awsaccount-221539347604-core-ecs
+technative-mcs:mustad-awsaccount-221539347604-rds
+technative-mcs:pastbook-holidays-workaround
