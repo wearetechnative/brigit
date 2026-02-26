@@ -1,23 +1,37 @@
 #!/usr/bin/env bash
 
 # Script to set branch protection for GitHub repositories based on ghbranchprotection.json configuration
-# Usage: ./set-branch-protection.sh [-f file_path]
+# Usage: ./set-branch-protection.sh [-o organization] [-r repository] [-f repos_file]
+
+# Source shared library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/_lib.sh"
 
 # Default values
-CONFIG_FILE="ghbranchprotection.json"
+CONFIG_FILE="$SCRIPT_DIR/ghbranchprotection.json"
 REPOS_FILE=""
+ORGANIZATION=""
+REPOSITORY=""
 
 # Function to display usage information
 usage() {
-    echo "Usage: $0 [-f repos_file]"
+    echo "Usage: $0 [-o organization] [-r repository] [-f repos_file]"
+    echo "  -o organization  GitHub organization name"
+    echo "  -r repository    Repository name (requires -o)"
     echo "  -f repos_file    Path to a text file containing repositories in format <org>:<repo> (one per line)"
     echo "  -h               Display this help message"
     exit 1
 }
 
 # Parse command line arguments
-while getopts "f:h" opt; do
+while getopts "o:r:f:h" opt; do
     case ${opt} in
+        o)
+            ORGANIZATION=$OPTARG
+            ;;
+        r)
+            REPOSITORY=$OPTARG
+            ;;
         f)
             REPOS_FILE=$OPTARG
             ;;
@@ -30,23 +44,13 @@ while getopts "f:h" opt; do
     esac
 done
 
-# Check if jq is installed
-if ! command -v jq &> /dev/null; then
-    echo "Error: jq is required but not installed. Please install jq."
-    exit 1
-fi
+# Initialize shared functionality
+check_prerequisites
+detect_interactive
+generate_timestamp
 
-# Check if GitHub CLI is installed
-if ! command -v gh &> /dev/null; then
-    echo "Error: GitHub CLI (gh) is required but not installed. Please install gh and authenticate."
-    exit 1
-fi
-
-# Check if gh is authenticated
-if ! gh auth status &> /dev/null; then
-    echo "Error: GitHub CLI is not authenticated. Please run 'gh auth login' first."
-    exit 1
-fi
+# Generate output file names
+OUTPUT_FILE="set-output-${TIMESTAMP}.txt"
 
 # Check if config file exists
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -55,29 +59,31 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 # Function to apply branch protection to a repository
+# Returns: 0 on success, 1 on failure
 apply_branch_protection() {
     local org=$1
     local repo=$2
-    
-    echo "Setting branch protection for $org/$repo..."
-    
+    local status="NOK"
+    local message=""
+
     # Get protection settings from config file - use default configuration
     local protection_config=$(jq -c '.default' "$CONFIG_FILE")
-    
+
     # If no default config, exit with error
     if [ "$protection_config" == "null" ]; then
-        echo "No default protection configuration found in $CONFIG_FILE."
+        message="No default protection configuration found"
+        failed_repos+=("$org:$repo: $message")
         return 1
     fi
-    
+
     # First check if the branch exists
     if ! gh api "/repos/$org/$repo/branches/main" &>/dev/null; then
-        echo "❌ Branch 'main' does not exist in repository $org/$repo"
+        message="Branch 'main' does not exist"
+        failed_repos+=("$org:$repo: $message")
         return 1
     fi
-    
+
     # Apply branch protection using GitHub API via gh CLI
-    # First, ensure the JSON is properly formatted with all required fields
     local complete_config=$(echo "$protection_config" | jq '{
         required_status_checks: .required_status_checks,
         enforce_admins: .enforce_admins,
@@ -88,72 +94,145 @@ apply_branch_protection() {
         },
         restrictions: .restrictions
     }')
-    
-    echo "Applying configuration: $(echo "$complete_config" | jq -c '.')"
+
     response=$(echo "$complete_config" | gh api --method PUT "/repos/$org/$repo/branches/main/protection" --input - 2>&1)
     exit_code=$?
-    
+
     if [ $exit_code -eq 0 ]; then
-        echo "✅ Branch protection applied successfully for $org/$repo"
-        echo "   Configuration applied: $(echo "$protection_config" | jq -c '.')"
-        
-        # Verify the protection was applied correctly
-        verify_response=$(gh api "/repos/$org/$repo/branches/main/protection" 2>/dev/null)
-        verify_exit=$?
-        if [ $verify_exit -eq 0 ]; then
-            echo "   Verification successful: protection is enabled"
-            echo "   Protection details: $(echo "$verify_response" | jq -c '.required_pull_request_reviews')"
-        else
-            echo "   ⚠️ Warning: Could not verify protection status (exit code: $verify_exit)"
-        fi
+        status="OK"
+        return 0
     else
-        echo "❌ Failed to apply branch protection for $org/$repo"
-        
         # Check for specific error messages
         if echo "$response" | grep -q "Upgrade to GitHub Pro"; then
-            echo "   Error: Branch protection requires GitHub Pro for private repositories."
-            echo "   Options: 1) Make the repository public, or 2) Upgrade to GitHub Pro"
+            message="Requires GitHub Pro for private repos"
         elif echo "$response" | grep -q "Not Found"; then
-            echo "   Error: Repository not found or you don't have sufficient permissions."
+            message="Repository not found or no permissions"
         else
-            echo "   Error details: $response"
+            message="Failed to apply protection"
         fi
+        failed_repos+=("$org:$repo: $message")
+        return 1
     fi
 }
 
-# Process repositories
+# Initialize arrays
+declare -a failed_repos
+declare -a repos_to_process
+
+# Validate that -r requires -o
+if [ -n "$REPOSITORY" ] && [ -z "$ORGANIZATION" ]; then
+    echo "Error: Organization (-o) must be specified when specifying a repository (-r)."
+    exit 1
+fi
+
+# Build list of repositories to process
 if [ -n "$REPOS_FILE" ]; then
     # Check if repos file exists
     if [ ! -f "$REPOS_FILE" ]; then
         echo "Error: Repositories file $REPOS_FILE not found."
         exit 1
     fi
-    
+
     # Read repositories from file
     while IFS=: read -r org repo; do
         # Skip empty lines or lines with invalid format
         if [ -z "$org" ] || [ -z "$repo" ]; then
             continue
         fi
-        
+
         # Remove any trailing whitespace
         org=$(echo "$org" | tr -d '[:space:]')
         repo=$(echo "$repo" | tr -d '[:space:]')
-        
-        apply_branch_protection "$org" "$repo"
+
+        repos_to_process+=("$org:$repo")
     done < "$REPOS_FILE"
+elif [ -n "$ORGANIZATION" ] && [ -n "$REPOSITORY" ]; then
+    repos_to_process+=("$ORGANIZATION:$REPOSITORY")
 else
-    # No file provided, prompt for organization and repository
-    read -p "Enter organization name: " org
-    read -p "Enter repository name: " repo
-    
-    # Validate input
-    if [ -z "$org" ] || [ -z "$repo" ]; then
-        echo "Error: Organization and repository names cannot be empty."
-        exit 1
-    fi
-    
-    apply_branch_protection "$org" "$repo"
+    echo "Error: Please provide either -f <repos_file> or both -o <organization> and -r <repository>."
+    usage
 fi
 
-echo "Branch protection setup completed."
+# Count repositories
+repo_count=${#repos_to_process[@]}
+echo "Setting branch protection for $repo_count repository/repositories..."
+echo
+
+# Collect results for table
+table_data="REPOSITORY,STATUS"
+success_count=0
+fail_count=0
+
+current_repo_num=0
+for repo_entry in "${repos_to_process[@]}"; do
+    current_repo_num=$((current_repo_num + 1))
+
+    # Parse org:repo format
+    org="${repo_entry%%:*}"
+    repo="${repo_entry#*:}"
+
+    # Show progress on a single line (overwrite previous)
+    show_progress "$current_repo_num" "$repo_count" "Setting protection for $org/$repo"
+
+    if apply_branch_protection "$org" "$repo"; then
+        success_count=$((success_count + 1))
+        table_data+="\n$org/$repo,OK"
+    else
+        fail_count=$((fail_count + 1))
+        table_data+="\n$org/$repo,NOK"
+    fi
+done
+
+# Clear the progress line
+clear_progress
+
+# Display results table
+print_table "$table_data"
+
+# Write table to output file
+echo -e "$table_data" | column -t -s "," > "$OUTPUT_FILE"
+
+# Print summary
+echo
+print_header "Summary:"
+echo "- Successfully applied: $success_count"
+echo "- Failed: $fail_count"
+echo "- Total processed: $repo_count"
+
+# Write summary to output file
+{
+    echo ""
+    echo "Summary:"
+    echo "- Successfully applied: $success_count"
+    echo "- Failed: $fail_count"
+    echo "- Total processed: $repo_count"
+} >> "$OUTPUT_FILE"
+
+# Print repositories with errors
+if [ ${#failed_repos[@]} -gt 0 ]; then
+    echo
+    print_warning_header "Failed repositories:"
+    for failed_repo in "${failed_repos[@]}"; do
+        echo "- $failed_repo"
+    done
+
+    # Write to output file
+    {
+        echo ""
+        echo "Failed repositories:"
+        for failed_repo in "${failed_repos[@]}"; do
+            echo "- $failed_repo"
+        done
+    } >> "$OUTPUT_FILE"
+fi
+
+# Print output file location
+echo
+echo "Output written to: $OUTPUT_FILE"
+
+# Exit with non-zero status if any failures
+if [ $fail_count -gt 0 ]; then
+    exit 1
+fi
+
+exit 0

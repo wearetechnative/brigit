@@ -1,0 +1,545 @@
+#!/usr/bin/env bash
+
+# brigit - Branch protection management tool
+# Manages GitHub branch protection rules for organizations
+
+function is_sourced() {
+    if [ -n "$ZSH_VERSION" ]; then
+        case $ZSH_EVAL_CONTEXT in *:file:*) return 0;; esac
+    else
+        case ${0##*/} in dash|-dash|bash|-bash|ksh|-ksh|sh|-sh) return 0;; esac
+    fi
+    return 1
+}
+
+is_sourced && sourced=1 || sourced=0
+
+if [ "$0" = "./brigit" ]; then
+    echo "RUNNING IN DEVMODE"
+    SCRIPT_DIR="$(dirname "$0")"
+else
+    if [ $sourced -eq 1 ]; then
+        SCRIPT_DIR="$(dirname "$(which brigit)")"
+    else
+        SCRIPT_DIR="$(dirname "$0")"
+    fi
+fi
+
+# Source shared library
+source "$SCRIPT_DIR/_lib.sh"
+
+# Command registration
+CMDS=()
+DESC=()
+NARGS=$#
+ARG1=$1
+shift
+ARGREST=$@
+
+make_command() {
+    CMDS+=("$1")
+    DESC+=("$2")
+}
+
+make_command "usage" "Show this help"
+usage() {
+    printf "\n"
+    if $INTERACTIVE; then
+        gum style --bold --foreground 212 "brigit - Branch Protection Management"
+    else
+        echo "brigit - Branch Protection Management"
+    fi
+    printf "\nUsage: %s <command> [options]\n\nCommands:\n" "$(basename $0)"
+
+    i=0
+    for cmd in "${CMDS[@]}"; do
+        printf "  %-12s %s\n" "${cmd}" "${DESC[$i]}"
+        i=$((i + 1))
+    done
+    printf "\nRun '%s <command> -h' for more information on a command.\n\n" "$(basename $0)"
+}
+
+runme() {
+    if test $NARGS -ge 1; then
+        eval "$ARG1" "$ARGREST" || usage
+    else
+        usage
+    fi
+}
+
+prelude() {
+    check_prerequisites
+    detect_interactive
+}
+
+##### COMMANDS #####
+
+make_command "version" "Show brigit version"
+version() {
+    echo "brigit v1.0.0"
+}
+
+make_command "scan" "Scan repositories for branch protection compliance"
+scan() {
+    prelude
+
+    local ORGANIZATION=""
+    local REPOSITORY=""
+    local DEBUG=false
+
+    # Parse arguments
+    while getopts "o:r:dh" opt; do
+        case ${opt} in
+            o)
+                ORGANIZATION=$OPTARG
+                ;;
+            r)
+                REPOSITORY=$OPTARG
+                ;;
+            d)
+                DEBUG=true
+                ;;
+            h)
+                echo "Usage: brigit scan -o <organization> [-r <repository>] [-d]"
+                echo ""
+                echo "Options:"
+                echo "  -o organization  GitHub organization to scan (required)"
+                echo "  -r repository    Specific repository to scan (optional)"
+                echo "  -d               Enable debug mode"
+                echo "  -h               Show this help"
+                return 0
+                ;;
+            \?)
+                echo "Usage: brigit scan -o <organization> [-r <repository>] [-d]"
+                return 1
+                ;;
+        esac
+    done
+
+    # Validate organization
+    if [ -z "$ORGANIZATION" ]; then
+        echo "Error: Organization (-o) is required."
+        echo "Usage: brigit scan -o <organization> [-r <repository>] [-d]"
+        return 1
+    fi
+
+    # Generate timestamp for output files
+    generate_timestamp
+    local SCRIPT_NAME=$(basename "$0")
+    local OUTPUT_FILE="${SCRIPT_NAME}-scan-${TIMESTAMP}.log"
+    local REPOS_OUTPUT_FILE="repos-${TIMESTAMP}.txt"
+
+    # Initialize array to store repositories with errors
+    declare -a error_repos
+
+    # Check a single repository or get list of repositories
+    local repos=""
+    local repo_count=0
+
+    if [ -n "$REPOSITORY" ]; then
+        if ! gh repo view "$ORGANIZATION/$REPOSITORY" &>/dev/null; then
+            echo "Error: Repository $ORGANIZATION/$REPOSITORY not found or you don't have access."
+            return 1
+        fi
+
+        echo "Scanning branch protection for repository: $ORGANIZATION/$REPOSITORY"
+        repos="$REPOSITORY"
+        repo_count=1
+    else
+        fetch_repos_with_spinner "$ORGANIZATION"
+        repos=$(echo "$repos_json" | jq -r '.[].name')
+
+        if [ -z "$repos" ]; then
+            echo "No repositories found for organization $ORGANIZATION or you don't have access."
+            return 1
+        fi
+
+        repo_count=$(echo "$repos" | wc -l | tr -d ' ')
+        echo "Found $repo_count repositories. Scanning branch protection..."
+    fi
+    echo
+
+    local matching_count=0
+    local non_matching_count=0
+    local error_count=0
+    local table_data="REPOSITORY,STATUS"
+
+    local current_repo_num=0
+    for repo in $repos; do
+        current_repo_num=$((current_repo_num + 1))
+        show_progress "$current_repo_num" "$repo_count" "Scanning $repo"
+
+        # Check branch protection
+        local current_protection
+        current_protection=$(gh api "/repos/$ORGANIZATION/$repo/branches/main/protection" 2>&1)
+        local exit_code=$?
+
+        if $DEBUG; then
+            clear_progress
+            echo "DEBUG: Raw API response for $ORGANIZATION/$repo:"
+            if [ $exit_code -eq 0 ]; then
+                echo "$current_protection" | jq '.' 2>/dev/null || echo "$current_protection"
+            else
+                echo "Error: $current_protection"
+            fi
+        fi
+
+        local status="NOK"
+        local error_msg=""
+
+        if [ $exit_code -ne 0 ] || [ -z "$current_protection" ] || [ "$current_protection" = "null" ] || echo "$current_protection" | grep -q "Branch not protected" || echo "$current_protection" | grep -q "Not Found"; then
+            local branch_info
+            branch_info=$(gh api "/repos/$ORGANIZATION/$repo/branches/main" 2>/dev/null)
+            if [ $? -ne 0 ]; then
+                error_msg="Branch 'main' does not exist"
+            else
+                error_msg="No branch protection enabled"
+            fi
+            error_repos+=("$repo: $error_msg")
+            error_count=$((error_count + 1))
+        elif ! echo "$current_protection" | jq '.' &>/dev/null; then
+            error_msg="Invalid response format"
+            error_repos+=("$repo: $error_msg")
+            error_count=$((error_count + 1))
+        else
+            local has_protection
+            has_protection=$(echo "$current_protection" | jq 'has("required_pull_request_reviews")' 2>/dev/null || echo "false")
+
+            if [ "$has_protection" != "true" ]; then
+                error_msg="Missing required pull request reviews"
+                error_repos+=("$repo: $error_msg")
+                error_count=$((error_count + 1))
+            else
+                local review_count
+                review_count=$(echo "$current_protection" | jq -r '.required_pull_request_reviews.required_approving_review_count // "0"')
+
+                if [ "$review_count" -ge 1 ]; then
+                    status="OK"
+                    matching_count=$((matching_count + 1))
+                else
+                    error_msg="Requires at least 1 approval (current: $review_count)"
+                    error_repos+=("$repo: $error_msg")
+                    non_matching_count=$((non_matching_count + 1))
+                fi
+            fi
+        fi
+
+        table_data+="\n$repo,$status"
+    done
+
+    clear_progress
+
+    # Display results
+    print_table "$table_data"
+    echo -e "$table_data" | column -t -s "," > "$OUTPUT_FILE"
+
+    echo
+    print_header "Summary:"
+    echo "- Repositories with proper branch protection: $matching_count"
+    echo "- Repositories with improper branch protection: $non_matching_count"
+    echo "- Repositories with errors (no protection or access issues): $error_count"
+    echo "- Total repositories scanned: $((matching_count + non_matching_count + error_count))"
+
+    {
+        echo ""
+        echo "Summary:"
+        echo "- Repositories with proper branch protection: $matching_count"
+        echo "- Repositories with improper branch protection: $non_matching_count"
+        echo "- Repositories with errors (no protection or access issues): $error_count"
+        echo "- Total repositories scanned: $((matching_count + non_matching_count + error_count))"
+    } >> "$OUTPUT_FILE"
+
+    if [ ${#error_repos[@]} -gt 0 ]; then
+        echo
+        print_warning_header "Repositories with issues:"
+        for error_repo in "${error_repos[@]}"; do
+            echo "- $error_repo"
+        done
+
+        {
+            echo ""
+            echo "Repositories with issues:"
+            for error_repo in "${error_repos[@]}"; do
+                echo "- $error_repo"
+            done
+        } >> "$OUTPUT_FILE"
+
+        for error_repo in "${error_repos[@]}"; do
+            echo "${ORGANIZATION}:${error_repo%%:*}" >> "$REPOS_OUTPUT_FILE"
+        done
+    fi
+
+    echo
+    echo "Output written to: $OUTPUT_FILE"
+    if [ ${#error_repos[@]} -gt 0 ]; then
+        echo "Repos with issues written to: $REPOS_OUTPUT_FILE"
+    fi
+
+    [ $non_matching_count -gt 0 ] && return 1
+    return 0
+}
+
+make_command "enforce" "Enforce branch protection on repositories"
+enforce() {
+    prelude
+
+    local ORGANIZATION=""
+    local REPOSITORY=""
+    local REPOS_FILE=""
+    local CONFIG_FILE="$SCRIPT_DIR/ghbranchprotection.json"
+
+    # Parse arguments
+    while getopts "o:r:f:h" opt; do
+        case ${opt} in
+            o)
+                ORGANIZATION=$OPTARG
+                ;;
+            r)
+                REPOSITORY=$OPTARG
+                ;;
+            f)
+                REPOS_FILE=$OPTARG
+                ;;
+            h)
+                echo "Usage: brigit enforce -o <organization> -r <repository>"
+                echo "       brigit enforce -f <repos_file>"
+                echo ""
+                echo "Options:"
+                echo "  -o organization  GitHub organization name"
+                echo "  -r repository    Repository name (requires -o)"
+                echo "  -f repos_file    File with repositories in format org:repo (one per line)"
+                echo "  -h               Show this help"
+                return 0
+                ;;
+            \?)
+                echo "Usage: brigit enforce -o <organization> -r <repository>"
+                return 1
+                ;;
+        esac
+    done
+
+    # Check config file
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo "Error: Configuration file $CONFIG_FILE not found."
+        return 1
+    fi
+
+    # Generate timestamp
+    generate_timestamp
+    local SCRIPT_NAME=$(basename "$0")
+    local OUTPUT_FILE="${SCRIPT_NAME}-enforce-${TIMESTAMP}.log"
+
+    # Initialize arrays
+    declare -a failed_repos
+    declare -a repos_to_process
+
+    # Validate and build repo list
+    if [ -n "$REPOSITORY" ] && [ -z "$ORGANIZATION" ]; then
+        echo "Error: Organization (-o) must be specified when specifying a repository (-r)."
+        return 1
+    fi
+
+    if [ -n "$REPOS_FILE" ]; then
+        if [ ! -f "$REPOS_FILE" ]; then
+            echo "Error: Repositories file $REPOS_FILE not found."
+            return 1
+        fi
+
+        while IFS=: read -r org repo; do
+            if [ -z "$org" ] || [ -z "$repo" ]; then
+                continue
+            fi
+            org=$(echo "$org" | tr -d '[:space:]')
+            repo=$(echo "$repo" | tr -d '[:space:]')
+            repos_to_process+=("$org:$repo")
+        done < "$REPOS_FILE"
+    elif [ -n "$ORGANIZATION" ] && [ -n "$REPOSITORY" ]; then
+        repos_to_process+=("$ORGANIZATION:$REPOSITORY")
+    else
+        echo "Error: Please provide either -f <repos_file> or both -o <organization> and -r <repository>."
+        echo "Usage: brigit enforce -o <organization> -r <repository>"
+        return 1
+    fi
+
+    local repo_count=${#repos_to_process[@]}
+    echo "Enforcing branch protection for $repo_count repository/repositories..."
+    echo
+
+    local table_data="REPOSITORY,STATUS"
+    local success_count=0
+    local fail_count=0
+
+    local current_repo_num=0
+    for repo_entry in "${repos_to_process[@]}"; do
+        current_repo_num=$((current_repo_num + 1))
+
+        local org="${repo_entry%%:*}"
+        local repo="${repo_entry#*:}"
+
+        show_progress "$current_repo_num" "$repo_count" "Enforcing on $org/$repo"
+
+        local status="NOK"
+        local message=""
+
+        # Get protection config
+        local protection_config
+        protection_config=$(jq -c '.default' "$CONFIG_FILE")
+
+        if [ "$protection_config" == "null" ]; then
+            message="No default config found"
+            failed_repos+=("$org:$repo: $message")
+            fail_count=$((fail_count + 1))
+            table_data+="\n$org/$repo,NOK"
+            continue
+        fi
+
+        # Check if branch exists
+        if ! gh api "/repos/$org/$repo/branches/main" &>/dev/null; then
+            message="Branch 'main' does not exist"
+            failed_repos+=("$org:$repo: $message")
+            fail_count=$((fail_count + 1))
+            table_data+="\n$org/$repo,NOK"
+            continue
+        fi
+
+        # Apply protection
+        local complete_config
+        complete_config=$(echo "$protection_config" | jq '{
+            required_status_checks: .required_status_checks,
+            enforce_admins: .enforce_admins,
+            required_pull_request_reviews: {
+                required_approving_review_count: (.required_pull_request_reviews.required_approving_review_count // 1),
+                dismiss_stale_reviews: (.required_pull_request_reviews.dismiss_stale_reviews // false),
+                require_code_owner_reviews: (.required_pull_request_reviews.require_code_owner_reviews // false)
+            },
+            restrictions: .restrictions
+        }')
+
+        local response
+        response=$(echo "$complete_config" | gh api --method PUT "/repos/$org/$repo/branches/main/protection" --input - 2>&1)
+        local exit_code=$?
+
+        if [ $exit_code -eq 0 ]; then
+            success_count=$((success_count + 1))
+            table_data+="\n$org/$repo,OK"
+        else
+            if echo "$response" | grep -q "Upgrade to GitHub Pro"; then
+                message="Requires GitHub Pro for private repos"
+            elif echo "$response" | grep -q "Not Found"; then
+                message="Repository not found or no permissions"
+            else
+                message="Failed to apply protection"
+            fi
+            failed_repos+=("$org:$repo: $message")
+            fail_count=$((fail_count + 1))
+            table_data+="\n$org/$repo,NOK"
+        fi
+    done
+
+    clear_progress
+
+    # Display results
+    print_table "$table_data"
+    echo -e "$table_data" | column -t -s "," > "$OUTPUT_FILE"
+
+    echo
+    print_header "Summary:"
+    echo "- Successfully applied: $success_count"
+    echo "- Failed: $fail_count"
+    echo "- Total processed: $repo_count"
+
+    {
+        echo ""
+        echo "Summary:"
+        echo "- Successfully applied: $success_count"
+        echo "- Failed: $fail_count"
+        echo "- Total processed: $repo_count"
+    } >> "$OUTPUT_FILE"
+
+    if [ ${#failed_repos[@]} -gt 0 ]; then
+        echo
+        print_warning_header "Failed repositories:"
+        for failed_repo in "${failed_repos[@]}"; do
+            echo "- $failed_repo"
+        done
+
+        {
+            echo ""
+            echo "Failed repositories:"
+            for failed_repo in "${failed_repos[@]}"; do
+                echo "- $failed_repo"
+            done
+        } >> "$OUTPUT_FILE"
+    fi
+
+    echo
+    echo "Output written to: $OUTPUT_FILE"
+
+    [ $fail_count -gt 0 ] && return 1
+    return 0
+}
+
+make_command "clean" "Clean up log files and repos*.txt files"
+clean() {
+    detect_interactive
+
+    # Find all brigit log files and repos*.txt files
+    local files=()
+    local script_name=$(basename "$0")
+
+    # Find log files
+    while IFS= read -r -d '' file; do
+        files+=("$file")
+    done < <(find "$SCRIPT_DIR" -maxdepth 1 -name "${script_name}-*.log" -print0 2>/dev/null)
+
+    # Find repos*.txt files
+    while IFS= read -r -d '' file; do
+        files+=("$file")
+    done < <(find "$SCRIPT_DIR" -maxdepth 1 -name "repos-*.txt" -print0 2>/dev/null)
+
+    # Check if there are files to clean
+    if [ ${#files[@]} -eq 0 ]; then
+        echo "No log files or repos*.txt files found to clean."
+        return 0
+    fi
+
+    # Display files that will be deleted
+    echo "The following files will be deleted:"
+    echo
+    for file in "${files[@]}"; do
+        echo "  $(basename "$file")"
+    done
+    echo
+    echo "Total: ${#files[@]} file(s)"
+    echo
+
+    # Ask for confirmation using gum
+    if $INTERACTIVE; then
+        local choice
+        choice=$(gum choose "no" "yes" --selected "no" --header "Delete these files?")
+        if [ "$choice" = "yes" ]; then
+            for file in "${files[@]}"; do
+                rm -f "$file"
+            done
+            gum style --foreground 82 "Deleted ${#files[@]} file(s)."
+        else
+            gum style --foreground 214 "Cleanup cancelled."
+        fi
+    else
+        read -p "Are you sure you want to delete these files? [y/N] " confirm
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            for file in "${files[@]}"; do
+                rm -f "$file"
+            done
+            echo "Deleted ${#files[@]} file(s)."
+        else
+            echo "Cleanup cancelled."
+        fi
+    fi
+
+    return 0
+}
+
+##### RUN #####
+detect_interactive
+runme
