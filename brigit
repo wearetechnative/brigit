@@ -14,8 +14,12 @@ function is_sourced() {
 
 is_sourced && sourced=1 || sourced=0
 
-if [ "$0" = "./brigit" ]; then
-    echo "RUNNING IN DEVMODE"
+# Determine script directory
+if [ -n "$BRIGIT_LIB_DIR" ]; then
+    # Running from Nix installation
+    SCRIPT_DIR="$BRIGIT_LIB_DIR"
+elif [ "$0" = "./brigit" ]; then
+    #echo "RUNNING IN DEVMODE"
     SCRIPT_DIR="$(dirname "$0")"
 else
     if [ $sourced -eq 1 ]; then
@@ -43,11 +47,12 @@ make_command() {
 
 make_command "usage" "Show this help"
 usage() {
+    local script_name=$(basename "$0" | tr '[:lower:]' '[:upper:]')
     printf "\n"
     if $INTERACTIVE; then
-        gum style --bold --foreground 212 "brigit - Branch Protection Management"
+        gum style --bold --foreground 212 "$script_name - Branch Integrity Guard for Git - by TechNative"
     else
-        echo "brigit - Branch Protection Management"
+        echo "$script_name - Branch Integrity Guard for Git - by TechNative"
     fi
     printf "\nUsage: %s <command> [options]\n\nCommands:\n" "$(basename $0)"
 
@@ -56,6 +61,16 @@ usage() {
         printf "  %-12s %s\n" "${cmd}" "${DESC[$i]}"
         i=$((i + 1))
     done
+    printf "\nCommon Options:\n"
+    printf "  -o <org>         GitHub organization name\n"
+    printf "  -r <repo>        Repository name (use with -o)\n"
+    printf "  -f <file>        File with repos in format org:repo (one per line)\n"
+    printf "\nExamples:\n"
+    printf "  %s scan -o <organization>      # Scan all repos in organization\n" "$(basename $0)"
+    printf "  %s scan -o <org> -r <repo>     # Scan specific repo\n" "$(basename $0)"
+    printf "  %s scan -f repos.txt           # Scan repos from file\n" "$(basename $0)"
+    printf "  %s enforce -o <org> -r <repo>  # Enforce on specific repo\n" "$(basename $0)"
+    printf "  %s enforce -f repos.txt        # Enforce on repos from file\n" "$(basename $0)"
     printf "\nRun '%s <command> -h' for more information on a command.\n\n" "$(basename $0)"
 }
 
@@ -91,10 +106,18 @@ prelude() {
 
 make_command "version" "Show brigit version"
 version() {
-    echo "brigit v1.0.0"
+    cat << EOF
+brigit v0.0.1
+    Branch Integrity Guard for Git
+
+    https://github.com/wearetechnative/brigit
+
+    by Wouter, et al.
+    © Technative 2026
+EOF
 }
 
-make_command "scan" "Scan repositories for branch protection compliance"
+make_command "scan" "Scan repositories (requires: -o or -f)"
 scan() {
     prelude
 
@@ -162,6 +185,13 @@ scan() {
     local OUTPUT_FILE="${SCRIPT_NAME}-scan-${TIMESTAMP}.log"
     local REPOS_OUTPUT_FILE="repos-${TIMESTAMP}.txt"
 
+    # Load ignore list
+    local IGNORE_FILE="$SCRIPT_DIR/repos-ignore.txt"
+    load_ignore_list "$IGNORE_FILE"
+    if [ ${#ignore_list[@]} -gt 0 ]; then
+        echo "Loaded ${#ignore_list[@]} repositories from ignore list."
+    fi
+
     # Initialize array to store repositories with errors
     declare -a error_repos
     declare -a repos_to_scan
@@ -218,6 +248,7 @@ scan() {
     local non_matching_count=0
     local error_count=0
     local archived_count=0
+    local ignored_count=0
     local table_data="REPOSITORY,STATUS"
 
     local current_repo_num=0
@@ -231,6 +262,14 @@ scan() {
 
         local status="NOK"
         local error_msg=""
+
+        # Check if repository should be ignored
+        if is_repo_ignored "$org" "$repo"; then
+            status="IGNORED"
+            ignored_count=$((ignored_count + 1))
+            table_data+="\n$org/$repo,$status"
+            continue
+        fi
 
         # Check if repository is archived
         if check_repo_archive "$org" "$repo"; then
@@ -309,7 +348,8 @@ scan() {
     echo "- Repositories with improper branch protection: $non_matching_count"
     echo "- Repositories with errors (branch missing or access issues): $error_count"
     echo "- Repositories in archived status: $archived_count"
-    echo "- Total repositories scanned: $((matching_count + non_matching_count + error_count + archived_count))"
+    echo "- Repositories ignored: $ignored_count"
+    echo "- Total repositories scanned: $((matching_count + non_matching_count + error_count + archived_count + ignored_count))"
 
     {
         echo ""
@@ -318,7 +358,8 @@ scan() {
         echo "- Repositories with improper branch protection: $non_matching_count"
         echo "- Repositories with errors (branch missing or access issues): $error_count"
         echo "- Repositories in archived status: $archived_count"
-        echo "- Total repositories scanned: $((matching_count + non_matching_count + error_count + archived_count))"
+        echo "- Repositories ignored: $ignored_count"
+        echo "- Total repositories scanned: $((matching_count + non_matching_count + error_count + archived_count + ignored_count))"
     } >> "$OUTPUT_FILE"
 
     if [ ${#error_repos[@]} -gt 0 ]; then
@@ -353,7 +394,7 @@ scan() {
     return 0
 }
 
-make_command "enforce" "Enforce branch protection on repositories"
+make_command "enforce" "Enforce branch protection (requires: -o + -r, or -f)"
 enforce() {
     prelude
 
@@ -403,6 +444,13 @@ enforce() {
     local SCRIPT_NAME=$(basename "$0")
     local OUTPUT_FILE="${SCRIPT_NAME}-enforce-${TIMESTAMP}.log"
 
+    # Load ignore list
+    local IGNORE_FILE="$SCRIPT_DIR/repos-ignore.txt"
+    load_ignore_list "$IGNORE_FILE"
+    if [ ${#ignore_list[@]} -gt 0 ]; then
+        echo "Loaded ${#ignore_list[@]} repositories from ignore list."
+    fi
+
     # Initialize arrays
     declare -a failed_repos
     declare -a repos_to_process
@@ -443,6 +491,7 @@ enforce() {
     local success_count=0
     local fail_count=0
     local skipped_count=0
+    local ignored_count=0
 
     local current_repo_num=0
     for repo_entry in "${repos_to_process[@]}"; do
@@ -455,6 +504,14 @@ enforce() {
 
         local status="NOK"
         local message=""
+
+        # Check if repository should be ignored
+        if is_repo_ignored "$org" "$repo"; then
+            status="IGN"
+            ignored_count=$((ignored_count + 1))
+            table_data+="\n$org/$repo,IGN"
+            continue
+        fi
 
         # Check if repository is archived
         if check_repo_archive "$org" "$repo"; then
@@ -531,6 +588,7 @@ enforce() {
     echo "- Successfully applied: $success_count"
     echo "- Failed: $fail_count"
     echo "- Skipped (archived): $skipped_count"
+    echo "- Ignored: $ignored_count"
     echo "- Total processed: $repo_count"
 
     {
@@ -539,6 +597,7 @@ enforce() {
         echo "- Successfully applied: $success_count"
         echo "- Failed: $fail_count"
         echo "- Skipped (archived): $skipped_count"
+        echo "- Ignored: $ignored_count"
         echo "- Total processed: $repo_count"
     } >> "$OUTPUT_FILE"
 

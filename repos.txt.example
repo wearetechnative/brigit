@@ -1,0 +1,19 @@
+# Repository List Example
+# Format: org:repo (one per line)
+# Use this file to scan or enforce specific repositories
+
+# Example repositories
+acme-corp:api-gateway
+acme-corp:user-service
+acme-corp:payment-processor
+acme-corp:frontend-app
+acme-corp:mobile-app
+
+# Another organization
+tech-startup:backend-monolith
+tech-startup:react-dashboard
+tech-startup:infrastructure
+
+# You can also mix different organizations
+myorg:legacy-application
+myorg:new-microservice

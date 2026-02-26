@@ -115,3 +115,44 @@ fetch_repos_with_spinner() {
         repos_json=$(gh repo list "$org" --json name --limit 100)
     fi
 }
+
+# Load ignore list from file
+# Usage: load_ignore_list "path/to/ignore-file.txt" -> sets $ignore_list array
+load_ignore_list() {
+    local ignore_file="$1"
+    ignore_list=()
+
+    if [ ! -f "$ignore_file" ]; then
+        return 0
+    fi
+
+    while IFS=: read -r org repo || [ -n "$org" ]; do
+        # Skip empty lines and comments
+        if [ -z "$org" ] || [[ "$org" =~ ^[[:space:]]*# ]]; then
+            continue
+        fi
+
+        if [ -z "$repo" ]; then
+            continue
+        fi
+
+        org=$(echo "$org" | tr -d '[:space:]')
+        repo=$(echo "$repo" | tr -d '[:space:]')
+        ignore_list+=("$org:$repo")
+    done < "$ignore_file"
+}
+
+# Check if a repository should be ignored
+# Usage: is_repo_ignored "org" "repo" -> returns 0 if ignored, 1 if not
+is_repo_ignored() {
+    local org="$1"
+    local repo="$2"
+    local repo_key="$org:$repo"
+
+    for ignored in "${ignore_list[@]}"; do
+        if [ "$ignored" = "$repo_key" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
