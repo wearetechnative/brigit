@@ -1,0 +1,31 @@
+# Repository Ignore List Example
+# Format: org:repo (one per line)
+# Lines starting with # are comments and will be ignored
+#
+# Use this to skip repositories that should not be scanned or enforced:
+# - Archived repositories (though brigit detects these automatically)
+# - Test/sandbox repositories
+# - Deprecated repositories
+# - Repositories with special requirements
+
+# Deprecated/old repositories
+acme-corp:legacy-v1-api
+acme-corp:old-website-2020
+acme-corp:deprecated-mobile-app
+
+# Test and sandbox repositories
+acme-corp:test-sandbox
+acme-corp:demo-project
+acme-corp:playground-experiments
+
+# Special cases - third-party forks
+acme-corp:vendor-library-fork
+acme-corp:external-integration-mirror
+
+# Temporary projects
+tech-startup:hackathon-2025
+tech-startup:poc-feature-x
+
+# Documentation only repositories (no code to protect)
+myorg:company-handbook
+myorg:onboarding-docs

@@ -1,3 +1,19 @@
+# Aider cache
 .aider*
-repos**txt
-**.log
+
+# Vim swap files
+.sw*
+
+# Nix build result
+result
+
+# Brigit generated files
+brigit-scan-*.log
+brigit-enforce-*.log
+repos-[0-9]*.txt
+
+
+# Optional: User's ignore list (uncomment to track in git) and repos list
+repos-ignore.txt
+repos.txt
+
