@@ -402,7 +402,14 @@ enforce() {
     local ORGANIZATION=""
     local REPOSITORY=""
     local REPOS_FILE=""
-    local CONFIG_FILE="$SCRIPT_DIR/ghbranchprotection.json"
+
+    # Config file location: check user config first, then system default
+    local CONFIG_FILE=""
+    if [ -f "$HOME/.config/brigit/ghbranchprotection.json" ]; then
+        CONFIG_FILE="$HOME/.config/brigit/ghbranchprotection.json"
+    else
+        CONFIG_FILE="$SCRIPT_DIR/ghbranchprotection.json"
+    fi
 
     # Parse arguments
     while getopts "o:r:f:h" opt; do
