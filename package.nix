@@ -30,6 +30,9 @@ stdenv.mkDerivation rec {
     # Install library
     cp _lib.sh $out/share/brigit/_lib.sh
 
+    # Install VERSION file
+    cp VERSION $out/share/brigit/VERSION
+
     # Install configuration
     cp ghbranchprotection.json $out/share/brigit/ghbranchprotection.json
 
