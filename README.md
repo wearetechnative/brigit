@@ -331,6 +331,64 @@ Set to `null` to allow all users with push access.
 
 For more information, see the [GitHub Branch Protection API documentation](https://docs.github.com/en/rest/branches/branch-protection).
 
+### Config File Locations
+
+Brigit searches for the configuration file in the following order:
+
+1. **User config** (customizable): `~/.config/brigit/ghbranchprotection.json`
+2. **System default** (read-only): Depends on installation method
+
+#### Nix/NixOS Installation
+
+When installed via Nix flake, the default config is in the read-only Nix store:
+```
+/nix/store/<hash>-brigit-<version>/share/brigit/ghbranchprotection.json
+```
+
+To customize the configuration:
+```bash
+# Create user config directory
+mkdir -p ~/.config/brigit
+
+# Copy system default to user location
+cp /nix/store/*-brigit-*/share/brigit/ghbranchprotection.json ~/.config/brigit/
+
+# Edit your custom config
+nano ~/.config/brigit/ghbranchprotection.json
+```
+
+#### Local/Development Installation
+
+When running from a git clone, the config is in the repository directory:
+```
+./ghbranchprotection.json
+```
+
+You can edit this file directly.
+
+#### Default Configuration
+
+The default `ghbranchprotection.json` includes:
+
+```json
+{
+  "default": {
+    "required_status_checks": null,
+    "enforce_admins": true,
+    "required_pull_request_reviews": {
+      "required_approving_review_count": 1,
+      "dismiss_stale_reviews": false,
+      "require_code_owner_reviews": false
+    },
+    "restrictions": null,
+    "allow_force_pushes": false,
+    "allow_deletions": false
+  }
+}
+```
+
+This provides basic protection requiring 1 approval, admin enforcement, and blocking force pushes/deletions.
+
 ### Ignore List
 
 You can skip specific repositories by creating a `repos-ignore.txt` file:
@@ -399,12 +457,38 @@ brigit scan -o technative-mcs
 
 ## Development
 
+### Running from Source
+
+Brigit can run directly from a git clone without installation:
+
 ```bash
-# Run in development mode
+# Clone the repository
+git clone https://github.com/wearetechnative/brigit.git
+cd brigit
+
+# Run directly
+./brigit scan -o <organization>
+./brigit version
+```
+
+The script will use the local `ghbranchprotection.json` in the repository directory.
+
+### Nix Development
+
+For Nix users:
+
+```bash
+# Enter development shell with dependencies
+nix develop
+
+# Run brigit in development shell
 ./brigit scan -o <organization>
 
 # Run tests
 nix flake check
+
+# Build package
+nix build .#brigit
 ```
 
 ## License
