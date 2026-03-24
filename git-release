@@ -290,9 +290,9 @@ main() {
         exit 1
     fi
 
-    # Push to remote
+    # Push to remote (commit and tags together)
     show_progress 6 6 "Pushing to GitHub"
-    if ! git push "$REMOTE_NAME" && git push "$REMOTE_NAME" --tags; then
+    if ! git push "$REMOTE_NAME" --follow-tags; then
         error "Failed to push to remote '$REMOTE_NAME'. Tag and commit may need manual cleanup."
         rm -f "$NOTES_FILE"
         exit 1
