@@ -1,7 +1,7 @@
 {
   description = "Branch Integrity Guard for Git - GitHub branch protection management tool";
 
-  inputs.nixpkgs.url = "nixpkgs/nixos-24.05";
+  inputs.nixpkgs.url = "nixpkgs/nixos-25.11";
 
   outputs = { self, nixpkgs }:
     let
