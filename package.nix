@@ -9,7 +9,7 @@
 
 stdenv.mkDerivation rec {
   pname = "brigit";
-  version = "0.0.1";
+  version = lib.trim (builtins.readFile ./VERSION);
 
   src = ./.;
 
