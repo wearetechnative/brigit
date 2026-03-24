@@ -89,30 +89,82 @@ gh api /repos/your-organization/your-repo/branches/main/protection
 
 ### Using Nix Flakes
 
+#### Quick Usage
+
 ```bash
-# Run directly
+# Run directly without installing
 nix run github:wearetechnative/brigit
 
 # Install in your profile
-nix profile add github:wearetechnative/brigit
-
-# Use in a development shell
-nix develop github:wearetechnative/brigit
+nix profile install github:wearetechnative/brigit
 ```
 
-### Manual Installation
+#### Add to Your Flake Configuration
+
+Add brigit as an input to your `flake.nix`:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    brigit.url = "github:wearetechnative/brigit";
+  };
+
+  outputs = { self, nixpkgs, brigit }: {
+    # NixOS configuration
+    nixosConfigurations.yourhostname = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        {
+          environment.systemPackages = [
+            brigit.packages.x86_64-linux.default
+          ];
+        }
+      ];
+    };
+  };
+}
+```
+
+#### Home Manager Integration
+
+Add to your home-manager configuration:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    home-manager.url = "github:nix-community/home-manager";
+    brigit.url = "github:wearetechnative/brigit";
+  };
+
+  outputs = { self, nixpkgs, home-manager, brigit }: {
+    homeConfigurations.yourusername = home-manager.lib.homeManagerConfiguration {
+      pkgs = nixpkgs.legacyPackages.x86_64-linux;
+      modules = [
+        {
+          home.packages = [
+            brigit.packages.x86_64-linux.default
+          ];
+        }
+      ];
+    };
+  };
+}
+```
+
+### Direct Installation (without Nix)
 
 ```bash
 # Clone the repository
 git clone https://github.com/wearetechnative/brigit
 cd brigit
 
-# Make executable
-chmod +x brigit
-
-# Run
-./brigit
+# Run directly
+./brigit scan -o <organization>
 ```
+
+**Requirements**: bash, gh (GitHub CLI), jq, gum
 
 ## Usage
 
@@ -453,42 +505,6 @@ echo "technative-mcs:old-repo" >> repos-ignore.txt
 
 # These repos will be marked as IGNORED
 brigit scan -o technative-mcs
-```
-
-## Development
-
-### Running from Source
-
-Brigit can run directly from a git clone without installation:
-
-```bash
-# Clone the repository
-git clone https://github.com/wearetechnative/brigit.git
-cd brigit
-
-# Run directly
-./brigit scan -o <organization>
-./brigit version
-```
-
-The script will use the local `ghbranchprotection.json` in the repository directory.
-
-### Nix Development
-
-For Nix users:
-
-```bash
-# Enter development shell with dependencies
-nix develop
-
-# Run brigit in development shell
-./brigit scan -o <organization>
-
-# Run tests
-nix flake check
-
-# Build package
-nix build .#brigit
 ```
 
 ## License
