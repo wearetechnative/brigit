@@ -23,9 +23,9 @@ stdenv.mkDerivation rec {
     mkdir -p $out/bin
     mkdir -p $out/share/brigit
 
-    # Install main script
-    cp brigit $out/bin/brigit
-    chmod +x $out/bin/brigit
+    # Install main script to share directory
+    cp brigit $out/share/brigit/brigit
+    chmod +x $out/share/brigit/brigit
 
     # Install library
     cp _lib.sh $out/share/brigit/_lib.sh
@@ -39,8 +39,9 @@ stdenv.mkDerivation rec {
     # Install example files
     cp repos-ignore.txt.example $out/share/brigit/repos-ignore.txt.example
 
-    # Wrap the binary to set PATH and point to the shared library
-    wrapProgram $out/bin/brigit \
+    # Create wrapper in bin directory that preserves binary name
+    makeWrapper $out/share/brigit/brigit $out/bin/brigit \
+      --argv0 brigit \
       --prefix PATH : ${lib.makeBinPath [ gh jq gum bash ]} \
       --set BRIGIT_LIB_DIR $out/share/brigit
 
