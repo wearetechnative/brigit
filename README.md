@@ -129,6 +129,12 @@ brigit scan -f repos.txt                         # Repos from file
 brigit enforce -o <organization> -r <repository>  # Specific repo
 brigit enforce -f repos-20260226_123456.txt       # From file
 
+# Create a release
+brigit release                                    # Interactive mode
+brigit release patch                              # Patch release (0.0.1 -> 0.0.2)
+brigit release minor                              # Minor release (0.0.1 -> 0.1.0)
+brigit release major                              # Major release (0.0.1 -> 1.0.0)
+
 # Clean up log files
 brigit clean                                      # Remove all log/repos files
 ```
@@ -147,6 +153,23 @@ brigit enforce -f repos-20260226_123456.txt
 # 4. Verify everything is resolved
 brigit scan -o my-org
 ```
+
+## Releases
+
+This repository includes a standalone `git-release` script for automated release management.
+
+**Quick start:**
+```bash
+./git-release          # Interactive mode
+./git-release patch    # Create patch release (0.0.1 → 0.0.2)
+```
+
+For complete documentation, see **[RELEASE.md](RELEASE.md)**:
+- Installation and setup
+- Usage examples (interactive & CI/CD)
+- CHANGELOG.md format requirements
+- Error handling and recovery
+- Full workflow documentation
 
 ## Output Files
 
