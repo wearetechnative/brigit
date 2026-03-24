@@ -106,8 +106,9 @@ prelude() {
 
 make_command "version" "Show brigit version"
 version() {
+    local VERSION_NUM=$(cat "$SCRIPT_DIR/VERSION" 2>/dev/null || echo "unknown")
     cat << EOF
-brigit v0.0.1
+brigit v${VERSION_NUM}
     Branch Integrity Guard for Git
 
     https://github.com/wearetechnative/brigit
@@ -684,6 +685,7 @@ clean() {
 
     return 0
 }
+
 
 ##### RUN #####
 detect_interactive
