@@ -1,7 +1,7 @@
 # Aider cache
 .aider*
 
-# Claude Code and OpenCode tool caches
+# Editor/AI assistant tool caches
 .claude/
 .opencode/
 
