@@ -3,6 +3,7 @@
 # Release Preparation Script for brigit
 #
 # This script prepares a new release by:
+#   0. Requiring that it is run on the 'main' branch with a clean tree
 #   1. Checking for uncommitted changes and remote connectivity
 #   2. Prompting for the release type (patch / minor / major)
 #   3. Optionally archiving completed OpenSpec changes
@@ -75,6 +76,14 @@ if [[ -z "$REMOTE" ]]; then
 fi
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 print_info "Remote: ${GREEN}${REMOTE}${NC}   Branch: ${GREEN}${BRANCH}${NC}"
+
+# Releases may only be cut from the main branch
+if [[ "$BRANCH" != "main" ]]; then
+    print_error "Releases must be run on the 'main' branch (current: '${BRANCH}')."
+    print_info "Switch first: git checkout main && git pull ${REMOTE} main"
+    exit 1
+fi
+print_success "On the main branch"
 
 # Check remote connectivity
 print_info "Checking remote connectivity..."

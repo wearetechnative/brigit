@@ -195,7 +195,8 @@ the git commit and tag:
 ./release.sh
 ```
 
-It prompts for the release type (patch / minor / major), moves the
+Releases may only be cut from the `main` branch with a clean working tree — the
+script aborts otherwise. It prompts for the release type (patch / minor / major), moves the
 `## [Unreleased]` changelog entries under the new version heading, verifies the
 Nix flake builds, and offers to push the commit and `vX.Y.Z` tag. Once the tag is
 pushed, Nix consumers pick up the new version via
