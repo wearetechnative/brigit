@@ -1,10 +1,9 @@
 # Aider cache
 .aider*
 
-# Claude Code and OpenSpec artifacts
+# Claude Code and OpenCode tool caches
 .claude/
 .opencode/
-openspec/
 
 # Vim swap files
 .sw*
