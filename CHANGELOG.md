@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-07-31
+
 ### Added
 - **Configurable output directory**: Output/log files now go to a dedicated directory instead of the current working directory
   - New default location: `${XDG_STATE_HOME:-~/.local/state}/brigit/` (XDG-compliant)
@@ -73,3 +75,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `repos-ignore.txt` - Optional ignore list for repositories
 
 [0.0.1]: https://github.com/wearetechnative/brigit/releases/tag/v0.0.1
+[0.0.5]: https://github.com/wearetechnative/brigit/releases/tag/v0.0.5
