@@ -3,7 +3,6 @@
 ## Purpose
 
 Scan GitHub repositories to check compliance with branch protection rules. Provides read-only auditing of current protection state without making any changes.
-
 ## Requirements
 
 ### Functional Requirements
@@ -65,6 +64,41 @@ Scan GitHub repositories to check compliance with branch protection rules. Provi
 - MUST NOT modify any GitHub settings (read-only operation)
 - MUST validate all inputs before making API calls
 - MUST handle network failures gracefully
+
+### Requirement: Scan output location and reporting
+
+`brigit scan` SHALL write its generated files to the resolved output directory (see the `output-location` capability) rather than the current working directory, and SHALL report the absolute path of each created file.
+
+#### Scenario: Scan writes log to resolved output directory
+- **WHEN** `brigit scan` produces a `brigit-scan-{timestamp}.log` file
+- **THEN** the file SHALL be created in the resolved output directory
+- **AND** brigit SHALL print its absolute path when the run completes
+
+#### Scenario: Scan writes issue file to resolved output directory
+- **WHEN** scanning finds repositories with issues and produces `repos-{timestamp}.txt`
+- **THEN** the file SHALL be created in the resolved output directory
+- **AND** brigit SHALL print its absolute path when the run completes
+
+#### Scenario: Issue file path is usable as enforce input
+- **WHEN** brigit reports the absolute path of the `repos-{timestamp}.txt` file
+- **THEN** that path SHALL be directly usable as the argument to `brigit enforce -f`
+
+### Requirement: Scan issue list naming
+
+The scan issue list SHALL be named `brigit-scan-<timestamp>.repos`, sharing the scan report's prefix and using the `.repos` extension for the machine-readable `org:repo` list.
+
+#### Scenario: Scan produces a .repos issue list
+- **WHEN** `brigit scan` finds repositories with issues
+- **THEN** the issue list SHALL be written as `brigit-scan-<timestamp>.repos` in the resolved output directory
+- **AND** it SHALL share the `brigit-scan-<timestamp>` prefix with the scan report `brigit-scan-<timestamp>.log`
+
+#### Scenario: Issue list remains valid enforce input
+- **WHEN** brigit reports the path of the `brigit-scan-<timestamp>.repos` file
+- **THEN** that path SHALL be directly usable as the argument to `brigit enforce -f`
+
+#### Scenario: Cleanup recognizes the .repos issue list
+- **WHEN** `brigit clean` runs
+- **THEN** it SHALL include `brigit-scan-*.repos` files as candidates for deletion
 
 ## Data Model
 
