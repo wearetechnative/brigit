@@ -10,6 +10,7 @@
 - **Uniform output file naming**: all generated files follow the grammar `brigit-<command>-<timestamp>.<ext>`
   - `.log` = human-readable report, `.repos` = machine-readable `org:repo` list
   - Both `scan` artifacts share the `brigit-scan-<timestamp>` prefix and sort adjacently
+- **`release.sh`**: interactive release helper that bumps `VERSION`, moves `## [Unreleased]` changelog entries under the new version heading, optionally refreshes `flake.lock`, verifies the Nix flake build, and creates the git commit and `vX.Y.Z` tag
 
 ### Changed
 - **BREAKING**: the scan issue list is now named `brigit-scan-<timestamp>.repos` (previously `repos-<timestamp>.txt`). Its `org:repo` format is unchanged and it is still valid input for `brigit enforce -f`; only the name and extension changed.
@@ -17,6 +18,7 @@
 
 ### Fixed
 - **`clean` command**: Now searches the resolved output directory instead of the script installation directory, so it works for Nix installations (previously it looked in the read-only Nix store and never found any files)
+- **Documentation**: removed the stale `brigit release` command from the README (it no longer exists); releasing is now documented via `./release.sh`
 
 ## [0.0.4] - 2026-03-24
 
