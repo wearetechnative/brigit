@@ -3,67 +3,110 @@
 ## Purpose
 
 Scan GitHub repositories to check compliance with branch protection rules. Provides read-only auditing of current protection state without making any changes.
+
 ## Requirements
 
-### Functional Requirements
+### Requirement: Organization-wide scanning
 
-**FR1: Organization-Wide Scanning**
-- MUST support scanning all repositories in a GitHub organization
-- MUST use GitHub API to list repositories (via `gh repo list`)
-- MUST handle pagination for organizations with 100+ repositories
-- MUST respect GitHub API rate limits
+The tool SHALL support scanning all repositories in a GitHub organization, using the GitHub API to list them, handling pagination for large organizations, and respecting API rate limits.
 
-**FR2: Selective Scanning**
-- MUST support scanning a single repository with `-o` and `-r` flags
-- MUST support scanning multiple repositories from a file with `-f` flag
-- MUST support format `org:repo` in input files (one per line)
-- MUST validate that repositories exist before scanning
+#### Scenario: Scan every repository in an organization
+- **WHEN** the user runs `brigit scan -o <org>`
+- **THEN** brigit SHALL list the organization's repositories via `gh repo list`
+- **AND** it SHALL handle pagination for organizations with 100 or more repositories
+- **AND** it SHALL respect GitHub API rate limits
 
-**FR3: Protection Rule Checking**
-- MUST check if branch `main` exists
-- MUST check if branch protection is enabled
-- MUST verify `required_pull_request_reviews` is configured
-- MUST verify `required_approving_review_count >= 1`
-- MUST return status: OK, NOK, ARCHIVED, IGNORED, or SKIPPED
+### Requirement: Selective scanning
 
-**FR4: Repository Filtering**
-- MUST automatically skip archived repositories
-- MUST respect repositories in `repos-ignore.txt`
-- MUST report count of filtered repositories separately
+The tool SHALL support scanning a single repository or a set of repositories supplied from a file in `org:repo` format, validating that repositories exist before scanning.
 
-**FR5: Error Handling**
-- MUST gracefully handle repositories without a `main` branch
-- MUST handle permission errors (no access to repository)
-- MUST handle API errors (rate limiting, timeouts)
-- MUST log errors but continue scanning other repositories
+#### Scenario: Scan a single repository
+- **WHEN** the user runs `brigit scan -o <org> -r <repo>`
+- **THEN** brigit SHALL validate the repository exists
+- **AND** it SHALL scan only that repository
 
-**FR6: Output Generation**
-- MUST generate timestamped log file `brigit-scan-{timestamp}.log`
-- MUST generate `brigit-scan-{timestamp}.repos` if issues found
-- MUST display summary statistics:
-  - Repositories with proper protection (OK)
-  - Repositories with improper protection (NOK)
-  - Repositories with errors (missing branch, access issues)
-  - Archived repositories (ARCHIVED)
-  - Ignored repositories (IGNORED)
-- MUST list each repository with issues and specific error message
+#### Scenario: Scan repositories from a file
+- **WHEN** the user runs `brigit scan -f <file>` with `org:repo` lines (one per line)
+- **THEN** brigit SHALL scan each listed repository
 
-### Non-Functional Requirements
+### Requirement: Protection rule checking
 
-**NFR1: Performance**
-- MUST show progress indicator during scan (when interactive)
-- MUST process repositories sequentially to avoid API rate limits
-- SHOULD complete scan of 100 repositories within 5 minutes
+The tool SHALL evaluate the `main` branch's protection and return a status of OK, NOK, ARCHIVED, IGNORED, or SKIPPED.
 
-**NFR2: Usability**
-- MUST use `gum` for interactive display (tables, spinners)
-- MUST support non-interactive mode for CI/CD
-- MUST provide clear error messages
+#### Scenario: Compliant repository
+- **WHEN** `main` exists, branch protection is enabled, `required_pull_request_reviews` is configured, and `required_approving_review_count` is at least 1
+- **THEN** brigit SHALL return status OK
 
-**NFR3: Reliability**
-- MUST NOT modify any GitHub settings (read-only operation)
-- MUST validate all inputs before making API calls
-- MUST handle network failures gracefully
+#### Scenario: Non-compliant repository
+- **WHEN** branch protection is missing or `required_approving_review_count` is below 1
+- **THEN** brigit SHALL return status NOK
+
+### Requirement: Repository filtering
+
+The tool SHALL skip archived repositories and repositories listed in `repos-ignore.txt`, and SHALL report the counts of filtered repositories separately.
+
+#### Scenario: Archived repository is skipped
+- **WHEN** a repository is archived
+- **THEN** brigit SHALL skip it and count it as ARCHIVED
+
+#### Scenario: Ignored repository is skipped
+- **WHEN** a repository appears in `repos-ignore.txt`
+- **THEN** brigit SHALL skip it and count it as IGNORED
+
+### Requirement: Error handling
+
+The tool SHALL handle per-repository errors gracefully and continue scanning the remaining repositories.
+
+#### Scenario: Repository without a main branch
+- **WHEN** a repository has no `main` branch
+- **THEN** brigit SHALL report it as an error
+- **AND** it SHALL continue scanning the other repositories
+
+#### Scenario: Access or API error
+- **WHEN** a permission error or an API error (rate limiting, timeout) occurs for a repository
+- **THEN** brigit SHALL log the error
+- **AND** it SHALL continue scanning the other repositories
+
+### Requirement: Scan report generation
+
+`brigit scan` SHALL generate a timestamped log file containing the results table, summary statistics, and the list of repositories with issues.
+
+#### Scenario: Report includes summary statistics
+- **WHEN** a scan completes
+- **THEN** the log SHALL include counts of repositories with proper protection (OK), improper protection (NOK), errors, archived, and ignored
+
+#### Scenario: Report lists repositories with issues
+- **WHEN** repositories are found with improper protection or errors
+- **THEN** the log SHALL list each such repository with its specific error message
+
+### Requirement: Scan performance
+
+The tool SHALL show a progress indicator during interactive scans and process repositories sequentially to avoid hitting API rate limits.
+
+#### Scenario: Progress shown during interactive scan
+- **WHEN** a scan runs in an interactive terminal
+- **THEN** brigit SHALL show a progress indicator
+- **AND** it SHALL process repositories sequentially
+
+### Requirement: Interactive and non-interactive usability
+
+The tool SHALL use `gum` for interactive display, SHALL support a non-interactive mode for CI/CD, and SHALL provide clear error messages.
+
+#### Scenario: Interactive display
+- **WHEN** a scan runs in an interactive terminal
+- **THEN** brigit SHALL render tables and spinners using `gum`
+
+#### Scenario: Non-interactive mode for CI/CD
+- **WHEN** a scan runs without an interactive terminal
+- **THEN** brigit SHALL produce plain output suitable for CI/CD
+
+### Requirement: Read-only reliability
+
+The tool SHALL NOT modify any GitHub settings during a scan, SHALL validate all inputs before making API calls, and SHALL handle network failures gracefully.
+
+#### Scenario: Scan makes no modifications
+- **WHEN** any scan runs
+- **THEN** brigit SHALL NOT modify any GitHub branch protection or repository settings
 
 ### Requirement: Scan output location and reporting
 
@@ -75,12 +118,12 @@ Scan GitHub repositories to check compliance with branch protection rules. Provi
 - **AND** brigit SHALL print its absolute path when the run completes
 
 #### Scenario: Scan writes issue file to resolved output directory
-- **WHEN** scanning finds repositories with issues and produces `repos-{timestamp}.txt`
+- **WHEN** scanning finds repositories with issues and produces `brigit-scan-{timestamp}.repos`
 - **THEN** the file SHALL be created in the resolved output directory
 - **AND** brigit SHALL print its absolute path when the run completes
 
 #### Scenario: Issue file path is usable as enforce input
-- **WHEN** brigit reports the absolute path of the `repos-{timestamp}.txt` file
+- **WHEN** brigit reports the absolute path of the `brigit-scan-{timestamp}.repos` file
 - **THEN** that path SHALL be directly usable as the argument to `brigit enforce -f`
 
 ### Requirement: Scan issue list naming

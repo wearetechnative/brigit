@@ -1,4 +1,10 @@
-## ADDED Requirements
+# Nix Binary Naming Capability
+
+## Purpose
+
+Ensure that when brigit is installed via the Nix package manager, the binary presents itself as `brigit` (not `.brigit-wrapped`) in process listings, generated file names, and command invocation, while preserving all script functionality.
+
+## Requirements
 
 ### Requirement: Binary name appears correctly in process list
 When brigit is installed via Nix package manager, the binary name SHALL appear as "brigit" (not ".brigit-wrapped") in process listings such as ps, top, and htop.
