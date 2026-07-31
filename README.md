@@ -181,15 +181,25 @@ brigit scan -f repos.txt                         # Repos from file
 brigit enforce -o <organization> -r <repository>  # Specific repo
 brigit enforce -f brigit-scan-20260226_123456.repos       # From file
 
-# Create a release
-brigit release                                    # Interactive mode
-brigit release patch                              # Patch release (0.0.1 -> 0.0.2)
-brigit release minor                              # Minor release (0.0.1 -> 0.1.0)
-brigit release major                              # Major release (0.0.1 -> 1.0.0)
-
 # Clean up generated files
 brigit clean                                      # Remove all .log/.repos files
 ```
+
+## Releasing
+
+Maintainers cut a release with the interactive helper script, which bumps
+`VERSION`, updates `CHANGELOG.md`, optionally refreshes `flake.lock`, and creates
+the git commit and tag:
+
+```bash
+./release.sh
+```
+
+It prompts for the release type (patch / minor / major), moves the
+`## [Unreleased]` changelog entries under the new version heading, verifies the
+Nix flake builds, and offers to push the commit and `vX.Y.Z` tag. Once the tag is
+pushed, Nix consumers pick up the new version via
+`nix run github:wearetechnative/brigit`.
 
 ## Workflow
 
