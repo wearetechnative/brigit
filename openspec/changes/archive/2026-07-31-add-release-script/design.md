@@ -297,4 +297,4 @@ If release script has critical issues:
 
 4. **Release branch naming**: Current design assumes release from current branch. Should we enforce release from main branch only?
 
-5. **Co-Authored-By for automated commits**: Should release commits include Claude co-authorship like other commits in the project?
+5. **Co-Authored-By for automated commits**: Should release commits include co-authorship trailers?
