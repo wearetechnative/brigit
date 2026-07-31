@@ -197,10 +197,11 @@ brigit clean                                      # Remove all log/repos files
 # 1. Scan an organization
 brigit scan -o my-org
 
-# 2. Review results in brigit-scan-*.log
+# 2. Review results in the reported log path,
+#    e.g. ~/.local/state/brigit/brigit-scan-20260226_123456.log
 
-# 3. Enforce protection on repos with issues
-brigit enforce -f repos-20260226_123456.txt
+# 3. Enforce protection on repos with issues, using the reported path
+brigit enforce -f ~/.local/state/brigit/repos-20260226_123456.txt
 
 # 4. Verify everything is resolved
 brigit scan -o my-org
@@ -215,6 +216,34 @@ brigit scan -o my-org
 | `repos-yyyymmdd_hhmmss.txt` | Repos with issues (only created if issues exist) |
 
 The `repos-*.txt` file contains repositories in `org:repo` format and can be used directly as input for `brigit enforce -f`.
+
+### Output Location
+
+By default, output files are written to an [XDG](https://specification.freedesktop.org/basedir-spec/basedir-spec-latest.html)-compliant state directory, **not** the current working directory:
+
+```
+${XDG_STATE_HOME:-~/.local/state}/brigit/
+```
+
+At the end of each run, `brigit scan` and `brigit enforce` print the absolute path of every file they created, so you can always find your reports.
+
+The output directory can be overridden. The location is resolved using the following precedence (highest first):
+
+| Precedence | Mechanism | Example |
+|------------|-----------|---------|
+| 1 (highest) | Command-line flag | `brigit scan -o my-org -O /tmp/brigit` |
+| 2 | Environment variable | `BRIGIT_OUTPUT_DIR=/tmp brigit scan -o my-org` |
+| 3 | Config file setting | `output_dir = ~/reports/brigit` in `~/.config/brigit/config` |
+| 4 (lowest) | XDG default | `~/.local/state/brigit/` |
+
+The config file uses a simple `key = value` format (lines starting with `#` are ignored):
+
+```ini
+# ~/.config/brigit/config
+output_dir = ~/reports/brigit
+```
+
+`brigit clean` removes generated files from this same resolved output directory.
 
 ## Configuration
 
@@ -493,8 +522,8 @@ brigit scan -f repos.txt
 ### Enforce protection on repositories with issues
 
 ```bash
-# After scanning, use the generated repos-*.txt file
-brigit enforce -f repos-20260226_123456.txt
+# After scanning, use the generated repos-*.txt file (path is printed by scan)
+brigit enforce -f ~/.local/state/brigit/repos-20260226_123456.txt
 ```
 
 ### Using the ignore list
