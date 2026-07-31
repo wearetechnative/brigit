@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+- **Configurable output directory**: Output/log files now go to a dedicated directory instead of the current working directory
+  - New default location: `${XDG_STATE_HOME:-~/.local/state}/brigit/` (XDG-compliant)
+  - Override precedence: `-O <dir>` flag > `BRIGIT_OUTPUT_DIR` env var > `output_dir` in `~/.config/brigit/config` > XDG default
+  - `scan` and `enforce` now print the absolute path of every file they create
+
+### Changed
+- **BREAKING**: `scan` and `enforce` no longer write `brigit-scan-*.log`, `brigit-enforce-*.log`, or `repos-*.txt` to the current working directory. Automation reading these from the CWD must be updated (or set `BRIGIT_OUTPUT_DIR=$PWD` to restore the old behavior).
+
+### Fixed
+- **`clean` command**: Now searches the resolved output directory instead of the script installation directory, so it works for Nix installations (previously it looked in the read-only Nix store and never found any files)
+
 ## [0.0.4] - 2026-03-24
 
 ## [0.0.3] - 2026-03-24
