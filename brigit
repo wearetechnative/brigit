@@ -206,7 +206,7 @@ scan() {
     generate_timestamp
     local SCRIPT_NAME=$(basename "$0")
     local OUTPUT_FILE="${OUTPUT_DIR}/${SCRIPT_NAME}-scan-${TIMESTAMP}.log"
-    local REPOS_OUTPUT_FILE="${OUTPUT_DIR}/repos-${TIMESTAMP}.txt"
+    local REPOS_OUTPUT_FILE="${OUTPUT_DIR}/${SCRIPT_NAME}-repos-${TIMESTAMP}.txt"
 
     # Load ignore list
     local IGNORE_FILE="$SCRIPT_DIR/repos-ignore.txt"
@@ -681,7 +681,7 @@ clean() {
     # Find repos*.txt files
     while IFS= read -r -d '' file; do
         files+=("$file")
-    done < <(find "$OUTPUT_DIR" -maxdepth 1 -name "repos-*.txt" -print0 2>/dev/null)
+    done < <(find "$OUTPUT_DIR" -maxdepth 1 -name "${script_name}-repos-*.txt" -print0 2>/dev/null)
 
     # Check if there are files to clean
     if [ ${#files[@]} -eq 0 ]; then

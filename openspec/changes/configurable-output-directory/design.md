@@ -42,7 +42,7 @@ Add `resolve_output_dir()` that applies D2 and `mkdir -p`s the result, setting a
 Read `output_dir` from `~/.config/brigit/config` with a simple, comment-tolerant `key=value` grep/parse — no new dependency, consistent with the shell-script nature of the tool. `~` / `$HOME` in the value is expanded. Absent file or absent key → fall through to default.
 
 **D5: Report absolute paths at end of run.**
-Existing "Output written to: …" lines switch to absolute paths (the resolved dir is absolute). `scan` lists both the `.log` and, when created, the `repos-*.txt`; `enforce` lists its `.log`. A run that creates nothing beyond the log still reports the log.
+Existing "Output written to: …" lines switch to absolute paths (the resolved dir is absolute). `scan` lists both the `.log` and, when created, the `brigit-repos-*.txt`; `enforce` lists its `.log`. A run that creates nothing beyond the log still reports the log.
 
 ## Risks / Trade-offs
 

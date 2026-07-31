@@ -10,7 +10,7 @@
 - [x] 2.1 Add `-O <dir>` to `scan` getopts and help text
 - [x] 2.2 Call `resolve_output_dir` after arg parsing, passing the `-O` value
 - [x] 2.3 Build `OUTPUT_FILE` and `REPOS_OUTPUT_FILE` under `$OUTPUT_DIR` (absolute paths)
-- [x] 2.4 Change end-of-run reporting to print absolute paths of the log and (when created) the `repos-*.txt`
+- [x] 2.4 Change end-of-run reporting to print absolute paths of the log and (when created) the `brigit-repos-*.txt`
 
 ## 3. Wire `enforce` to the resolved directory (`brigit`)
 
@@ -28,7 +28,7 @@
 ## 5. Documentation
 
 - [x] 5.1 Update README.md "Output Files" section: new default location, override precedence (`-O` > `BRIGIT_OUTPUT_DIR` > config > XDG default), and the `output_dir` config setting
-- [x] 5.2 Update README examples that reference `repos-*.txt` / `brigit-scan-*.log` in the CWD to reflect the new location
+- [x] 5.2 Update README examples that reference `brigit-repos-*.txt` / `brigit-scan-*.log` in the CWD to reflect the new location
 - [x] 5.3 Update INSTALL.md if it references output/log file locations
 - [x] 5.4 Add a CHANGELOG entry under "## NEXT VERSION" noting the BREAKING location change, the override chain, and the `clean` fix
 

@@ -179,7 +179,7 @@ brigit scan -f repos.txt                         # Repos from file
 
 # Enforce branch protection
 brigit enforce -o <organization> -r <repository>  # Specific repo
-brigit enforce -f repos-20260226_123456.txt       # From file
+brigit enforce -f brigit-repos-20260226_123456.txt       # From file
 
 # Create a release
 brigit release                                    # Interactive mode
@@ -201,7 +201,7 @@ brigit scan -o my-org
 #    e.g. ~/.local/state/brigit/brigit-scan-20260226_123456.log
 
 # 3. Enforce protection on repos with issues, using the reported path
-brigit enforce -f ~/.local/state/brigit/repos-20260226_123456.txt
+brigit enforce -f ~/.local/state/brigit/brigit-repos-20260226_123456.txt
 
 # 4. Verify everything is resolved
 brigit scan -o my-org
@@ -213,9 +213,9 @@ brigit scan -o my-org
 |------|-------------|
 | `brigit-scan-yyyymmdd_hhmmss.log` | Scan results |
 | `brigit-enforce-yyyymmdd_hhmmss.log` | Enforce results |
-| `repos-yyyymmdd_hhmmss.txt` | Repos with issues (only created if issues exist) |
+| `brigit-repos-yyyymmdd_hhmmss.txt` | Repos with issues (only created if issues exist) |
 
-The `repos-*.txt` file contains repositories in `org:repo` format and can be used directly as input for `brigit enforce -f`.
+The `brigit-repos-*.txt` file contains repositories in `org:repo` format and can be used directly as input for `brigit enforce -f`.
 
 ### Output Location
 
@@ -522,8 +522,8 @@ brigit scan -f repos.txt
 ### Enforce protection on repositories with issues
 
 ```bash
-# After scanning, use the generated repos-*.txt file (path is printed by scan)
-brigit enforce -f ~/.local/state/brigit/repos-20260226_123456.txt
+# After scanning, use the generated brigit-repos-*.txt file (path is printed by scan)
+brigit enforce -f ~/.local/state/brigit/brigit-repos-20260226_123456.txt
 ```
 
 ### Using the ignore list

@@ -9,7 +9,8 @@
   - `scan` and `enforce` now print the absolute path of every file they create
 
 ### Changed
-- **BREAKING**: `scan` and `enforce` no longer write `brigit-scan-*.log`, `brigit-enforce-*.log`, or `repos-*.txt` to the current working directory. Automation reading these from the CWD must be updated (or set `BRIGIT_OUTPUT_DIR=$PWD` to restore the old behavior).
+- **BREAKING**: `scan` and `enforce` no longer write `brigit-scan-*.log`, `brigit-enforce-*.log`, or `brigit-repos-*.txt` to the current working directory. Automation reading these from the CWD must be updated (or set `BRIGIT_OUTPUT_DIR=$PWD` to restore the old behavior).
+- **BREAKING**: the scan issue file is now named `brigit-repos-<timestamp>.txt` (was `repos-<timestamp>.txt`), matching the log-file naming convention.
 
 ### Fixed
 - **`clean` command**: Now searches the resolved output directory instead of the script installation directory, so it works for Nix installations (previously it looked in the read-only Nix store and never found any files)

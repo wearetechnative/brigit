@@ -1,6 +1,6 @@
 ## Why
 
-Brigit writes its output files (`brigit-scan-*.log`, `brigit-enforce-*.log`, `repos-*.txt`) into the current working directory, cluttering whatever directory the user happens to run it from. This also creates a latent bug: the `clean` command looks for these files in `$SCRIPT_DIR`, which for Nix installations is the read-only Nix store — so `clean` never finds files written to the CWD. A single, well-defined output location fixes both the clutter and the broken cleanup.
+Brigit writes its output files (`brigit-scan-*.log`, `brigit-enforce-*.log`, `brigit-repos-*.txt`) into the current working directory, cluttering whatever directory the user happens to run it from. This also creates a latent bug: the `clean` command looks for these files in `$SCRIPT_DIR`, which for Nix installations is the read-only Nix store — so `clean` never finds files written to the CWD. A single, well-defined output location fixes both the clutter and the broken cleanup.
 
 ## What Changes
 
@@ -30,6 +30,6 @@ Brigit writes its output files (`brigit-scan-*.log`, `brigit-enforce-*.log`, `re
 **User Workflow Changes**:
 - Output no longer appears in the CWD; users find reports under `~/.local/state/brigit/` by default.
 - Users can point output elsewhere (e.g. `/tmp`) via `BRIGIT_OUTPUT_DIR`, `-O`, or the config file.
-- Any automation that reads `brigit-scan-*.log` / `repos-*.txt` from the CWD must be updated (breaking change).
+- Any automation that reads `brigit-scan-*.log` / `brigit-repos-*.txt` from the CWD must be updated (breaking change).
 
 **Dependencies**: None new. Relies on existing `~/.config/brigit/` convention introduced by `user-config-directory-support`.

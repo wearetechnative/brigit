@@ -51,7 +51,7 @@ At the end of a command that produces output, brigit SHALL report the absolute p
 #### Scenario: Scan reports created files
 - **WHEN** `brigit scan` completes and writes a log file
 - **THEN** brigit SHALL print the absolute path of the log file
-- **AND** SHALL print the absolute path of the `repos-*.txt` file when one was created
+- **AND** SHALL print the absolute path of the `brigit-repos-*.txt` file when one was created
 
 #### Scenario: Enforce reports created file
 - **WHEN** `brigit enforce` completes and writes a log file
@@ -64,7 +64,7 @@ The `clean` command SHALL remove brigit-generated files from the same resolved o
 #### Scenario: Clean finds files in the resolved output directory
 - **WHEN** output files exist in the resolved output directory
 - **AND** the user runs `brigit clean`
-- **THEN** brigit SHALL list those log and `repos-*.txt` files as candidates for deletion
+- **THEN** brigit SHALL list those log and `brigit-repos-*.txt` files as candidates for deletion
 - **AND** SHALL delete them after confirmation
 
 #### Scenario: Clean works for Nix installations
