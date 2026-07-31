@@ -14,7 +14,7 @@ result
 # Brigit generated files
 brigit-scan-*.log
 brigit-enforce-*.log
-repos-[0-9]*.txt
+brigit-scan-*.repos
 
 
 # Optional: User's ignore list (uncomment to track in git) and repos list

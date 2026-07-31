@@ -40,7 +40,7 @@ Scan GitHub repositories to check compliance with branch protection rules. Provi
 
 **FR6: Output Generation**
 - MUST generate timestamped log file `brigit-scan-{timestamp}.log`
-- MUST generate `repos-{timestamp}.txt` if issues found
+- MUST generate `brigit-scan-{timestamp}.repos` if issues found
 - MUST display summary statistics:
   - Repositories with proper protection (OK)
   - Repositories with improper protection (NOK)
@@ -101,7 +101,7 @@ Log file: brigit-scan-{YYYYMMDD_HHMMSS}.log
   Issues list:
     - org/repo: error message
 
-Issue file: repos-{YYYYMMDD_HHMMSS}.txt
+Issue file: brigit-scan-{YYYYMMDD_HHMMSS}.repos
   Format: org:repo (one per line)
   Contains: Only repos with NOK or error status
 ```
@@ -178,7 +178,7 @@ brigit scan -o technative-mcs -d
 
 ## Related Capabilities
 
-- **Enforcement**: Uses scan output (`repos-*.txt`) as input
+- **Enforcement**: Uses scan output (`brigit-scan-*.repos`) as input
 - **Filtering**: Relies on ignore list loading
 - **Reporting**: Generates logs consumed by users
 - **Configuration**: Checks against rules in `ghbranchprotection.json`
