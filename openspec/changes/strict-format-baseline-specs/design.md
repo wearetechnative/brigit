@@ -10,7 +10,7 @@ See proposal.md — Why. The two target specs currently use `## Requirements` �
 
 **Non-Goals:**
 - No behavior change, no new/removed requirements.
-- No reformatting of other specs (`filtering`, `configuration`, `reporting`, `nix-binary-naming`, etc.) — only the two that block archiving.
+- Scope is the four specs that fail strict validation: `scanning`, `enforcement`, `filtering`, `nix-binary-naming`. The `configuration` and `reporting` capabilities have no `spec.md` yet (empty dirs), so there is nothing to reformat there.
 - Not deleting the auxiliary prose (Data Model, API Interactions, Edge Cases, Examples) if it stays valid — it can remain as supporting sections as long as it doesn't break validation.
 
 ## Decisions

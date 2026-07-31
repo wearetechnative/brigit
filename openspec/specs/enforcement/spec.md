@@ -3,74 +3,111 @@
 ## Purpose
 
 Apply branch protection rules to GitHub repositories. Modifies repository settings to enforce standardized protection configuration.
+
 ## Requirements
 
-### Functional Requirements
+### Requirement: Target selection
 
-**FR1: Target Selection**
-- MUST support enforcing on single repository with `-o` and `-r` flags
-- MUST support enforcing on multiple repositories from file with `-f` flag
-- MUST validate that organization and repository are provided
-- MUST NOT support organization-wide enforcement (too risky without explicit list)
+The tool SHALL support enforcing on a single repository (`-o` and `-r`) or on multiple repositories from a file (`-f`), SHALL validate that the required targets are provided, and SHALL NOT support organization-wide enforcement without an explicit list.
 
-**FR2: Configuration Loading**
-- MUST load protection rules from `ghbranchprotection.json`
-- MUST use `default` profile from configuration
-- MUST validate that configuration file exists
-- MUST fail gracefully if configuration is invalid
+#### Scenario: Enforce on a single repository
+- **WHEN** the user runs `brigit enforce -o <org> -r <repo>`
+- **THEN** brigit SHALL enforce protection on that repository
 
-**FR3: Protection Application**
-- MUST apply protection to `main` branch only
-- MUST set required pull request reviews
-- MUST set required approving review count (default: 1)
-- MUST set dismiss stale reviews flag
-- MUST set require code owner reviews flag
-- MUST apply all rules from configuration atomically
+#### Scenario: Enforce from a file
+- **WHEN** the user runs `brigit enforce -f <file>` with `org:repo` lines
+- **THEN** brigit SHALL enforce protection on each listed repository
 
-**FR4: Pre-Flight Checks**
-- MUST check if repository is archived (skip if true)
-- MUST check if repository is in ignore list (skip if true)
-- MUST verify `main` branch exists before applying
-- MUST handle missing branch as error
+#### Scenario: Organization-wide enforcement is refused
+- **WHEN** the user attempts enforcement with only `-o <org>` and no repository or file
+- **THEN** brigit SHALL refuse to run (no wildcard org-wide enforcement)
 
-**FR5: Permission Handling**
-- MUST detect "requires GitHub Pro" errors
-- MUST detect "no permission" errors
-- MUST report specific error messages
-- MUST continue processing other repos after errors
+### Requirement: Configuration loading
 
-**FR6: Output Generation**
-- MUST generate timestamped log file `brigit-enforce-{timestamp}.log`
-- MUST display summary statistics:
-  - Successfully applied: N
-  - Failed: N
-  - Skipped (archived): N
-  - Ignored: N
-  - Total processed: N
-- MUST list each failed repository with specific error message
+The tool SHALL load protection rules from `ghbranchprotection.json`, using the `default` profile, and SHALL fail gracefully when the configuration is missing or invalid.
 
-### Non-Functional Requirements
+#### Scenario: Valid configuration is loaded
+- **WHEN** `ghbranchprotection.json` exists with a `default` profile
+- **THEN** brigit SHALL load the `default` profile as the protection rules
 
-**NFR1: Safety**
-- MUST require explicit repository list (no wildcards)
-- MUST respect ignore list unconditionally
-- MUST skip archived repositories automatically
-- SHOULD allow dry-run mode (future enhancement)
+#### Scenario: Missing or invalid configuration
+- **WHEN** the configuration file is missing or invalid
+- **THEN** brigit SHALL fail gracefully with a clear message
 
-**NFR2: Performance**
-- MUST show progress indicator during enforcement (when interactive)
-- MUST process repositories sequentially
-- SHOULD complete enforcement of 50 repositories within 10 minutes
+### Requirement: Protection application
 
-**NFR3: Idempotency**
-- MUST be safe to run multiple times on same repository
-- MUST overwrite existing protection with new configuration
-- MUST handle "already protected" scenarios gracefully
+The tool SHALL apply the configured protection to the `main` branch only, setting required pull request reviews, approving review count (default 1), dismiss-stale-reviews, and require-code-owner-reviews, applying all rules from the configuration.
 
-**NFR4: Auditability**
-- MUST log every enforcement attempt
-- MUST record success/failure for each repository
-- MUST include timestamps in all log files
+#### Scenario: Protection applied to main
+- **WHEN** brigit enforces on a repository
+- **THEN** it SHALL apply the configured protection rules to the `main` branch
+- **AND** it SHALL set the required approving review count (defaulting to 1)
+
+### Requirement: Pre-flight checks
+
+The tool SHALL skip archived repositories and repositories in the ignore list, and SHALL verify the `main` branch exists before applying, treating a missing branch as an error.
+
+#### Scenario: Archived or ignored repository is skipped
+- **WHEN** a target repository is archived or appears in the ignore list
+- **THEN** brigit SHALL skip it without modifying it
+
+#### Scenario: Missing main branch
+- **WHEN** a target repository has no `main` branch
+- **THEN** brigit SHALL report it as an error and not apply protection
+
+### Requirement: Permission handling
+
+The tool SHALL detect "requires GitHub Pro" and "no permission" errors, report specific error messages, and continue processing the remaining repositories after an error.
+
+#### Scenario: Continue after a permission error
+- **WHEN** enforcement on a repository fails with a GitHub Pro or permission error
+- **THEN** brigit SHALL report a specific error message
+- **AND** it SHALL continue processing the other repositories
+
+### Requirement: Enforce report generation
+
+`brigit enforce` SHALL generate a timestamped log file with summary statistics and the list of failed repositories.
+
+#### Scenario: Report includes summary statistics
+- **WHEN** an enforcement run completes
+- **THEN** the log SHALL include counts of successfully applied, failed, skipped (archived), ignored, and total processed
+
+#### Scenario: Report lists failed repositories
+- **WHEN** repositories fail enforcement
+- **THEN** the log SHALL list each failed repository with its specific error message
+
+### Requirement: Enforcement safety
+
+The tool SHALL require an explicit repository list (no wildcards), SHALL respect the ignore list unconditionally, and SHALL skip archived repositories automatically.
+
+#### Scenario: No wildcard enforcement
+- **WHEN** enforcement is requested without an explicit repository or file
+- **THEN** brigit SHALL NOT perform any enforcement
+
+### Requirement: Enforcement performance
+
+The tool SHALL show a progress indicator during interactive enforcement and process repositories sequentially.
+
+#### Scenario: Progress shown during interactive enforcement
+- **WHEN** enforcement runs in an interactive terminal
+- **THEN** brigit SHALL show a progress indicator
+- **AND** it SHALL process repositories sequentially
+
+### Requirement: Idempotency
+
+The tool SHALL be safe to run multiple times on the same repository, overwriting existing protection with the configured rules.
+
+#### Scenario: Re-running enforcement
+- **WHEN** enforcement is run again on an already-protected repository
+- **THEN** brigit SHALL overwrite the existing protection with the configured rules without error
+
+### Requirement: Auditability
+
+The tool SHALL log every enforcement attempt, recording success or failure per repository with a timestamp.
+
+#### Scenario: Every attempt is logged
+- **WHEN** an enforcement run processes repositories
+- **THEN** the timestamped log SHALL record the success or failure of each repository
 
 ### Requirement: Enforce output location and reporting
 
