@@ -6,57 +6,79 @@ Exclude repositories from scanning and enforcement operations based on user-defi
 
 ## Requirements
 
-### Functional Requirements
+### Requirement: Ignore list loading
 
-**FR1: Ignore List Loading**
-- MUST load ignore list from `repos-ignore.txt` file
-- MUST support format `org:repo` (one per line)
-- MUST skip empty lines
-- MUST skip lines starting with `#` (comments)
-- MUST trim whitespace from organization and repository names
-- MUST handle missing ignore file gracefully (treat as empty)
+The tool SHALL load the ignore list from `repos-ignore.txt` in `org:repo` format, skipping empty lines and `#` comments, trimming whitespace, and treating a missing file as an empty list.
 
-**FR2: Repository Matching**
-- MUST match repositories exactly by `org:repo` key
-- MUST be case-sensitive (GitHub repos are case-sensitive)
-- MUST support multiple organizations in same ignore list
-- MUST allow duplicate entries (no error, just redundant)
+#### Scenario: Load a valid ignore file
+- **WHEN** `repos-ignore.txt` exists with `org:repo` lines, comments, and blank lines
+- **THEN** brigit SHALL load the `org:repo` entries
+- **AND** it SHALL skip empty lines and lines starting with `#`
+- **AND** it SHALL trim surrounding whitespace from each name
 
-**FR3: Archived Repository Detection**
-- MUST query GitHub API to check `isArchived` flag
-- MUST automatically skip archived repositories
-- MUST mark archived repos with ARCHIVED status
-- MUST count archived repos separately in summary
+#### Scenario: Missing ignore file
+- **WHEN** `repos-ignore.txt` does not exist
+- **THEN** brigit SHALL treat the ignore list as empty and proceed
 
-**FR4: Status Reporting**
-- MUST mark ignored repos with IGNORED status
-- MUST mark archived repos with ARCHIVED status
-- MUST report counts separately:
-  - Ignored (user-defined)
-  - Archived (system-detected)
-- MUST include both in summary statistics
+### Requirement: Repository matching
 
-**FR5: Early Exit**
-- MUST check ignore list before making any GitHub API calls
-- MUST check archived status before attempting protection operations
-- MUST skip all processing for filtered repositories
+The tool SHALL match ignore entries exactly by `org:repo` key, case-sensitively, supporting multiple organizations and tolerating duplicate entries.
 
-### Non-Functional Requirements
+#### Scenario: Exact case-sensitive match
+- **WHEN** a repository's `org:repo` key exactly matches an ignore entry
+- **THEN** brigit SHALL treat the repository as ignored
 
-**NFR1: Performance**
-- SHOULD load ignore list once at startup
-- SHOULD cache loaded ignore list in memory
-- MUST NOT reload ignore list for each repository
+#### Scenario: Duplicate entries are harmless
+- **WHEN** the ignore list contains duplicate entries
+- **THEN** brigit SHALL not error and SHALL treat the repository as ignored
 
-**NFR2: Transparency**
-- MUST report count of ignored repos at start
-- MUST show which repos are filtered in output
-- MUST differentiate between user-ignored and system-archived
+### Requirement: Archived repository detection
 
-**NFR3: Maintainability**
-- MUST provide example ignore file (`repos-ignore.txt.example`)
-- MUST document ignore file format
-- SHOULD validate ignore file format (warn on malformed lines)
+The tool SHALL query the GitHub API for the `isArchived` flag, automatically skip archived repositories, mark them ARCHIVED, and count them separately.
+
+#### Scenario: Archived repository detected
+- **WHEN** the GitHub API reports a repository as archived
+- **THEN** brigit SHALL skip it, mark it ARCHIVED, and count it separately
+
+### Requirement: Status reporting
+
+The tool SHALL mark ignored repositories IGNORED and archived repositories ARCHIVED, reporting the two counts separately in the summary statistics.
+
+#### Scenario: Separate counts in summary
+- **WHEN** a run filters both user-ignored and system-archived repositories
+- **THEN** the summary SHALL report the IGNORED and ARCHIVED counts separately
+
+### Requirement: Early exit for filtered repositories
+
+The tool SHALL check the ignore list before making any GitHub API calls and check archived status before attempting protection operations, skipping all further processing for filtered repositories.
+
+#### Scenario: Ignored repository is not queried
+- **WHEN** a repository is in the ignore list
+- **THEN** brigit SHALL skip it without making protection-related API calls
+
+### Requirement: Ignore list caching
+
+The tool SHALL load the ignore list once and reuse it, and SHALL NOT reload it for each repository.
+
+#### Scenario: Loaded once per run
+- **WHEN** a run processes many repositories
+- **THEN** brigit SHALL load the ignore list once and reuse it in memory
+
+### Requirement: Filtering transparency
+
+The tool SHALL report the count of ignored repositories at the start, show which repositories are filtered in the output, and differentiate user-ignored from system-archived.
+
+#### Scenario: Filtered repositories are visible
+- **WHEN** a run filters repositories
+- **THEN** the output SHALL show the ignored count and distinguish ignored from archived
+
+### Requirement: Ignore file documentation
+
+The project SHALL provide an example ignore file (`repos-ignore.txt.example`) and document the ignore file format.
+
+#### Scenario: Example file is available
+- **WHEN** a user looks for how to configure ignores
+- **THEN** an example `repos-ignore.txt.example` SHALL be available with the documented format
 
 ## Data Model
 
