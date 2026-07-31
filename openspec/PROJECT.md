@@ -69,7 +69,7 @@ Brigit provides this capability through a simple CLI interface that wraps the Gi
 
 ### File Naming
 - Generated logs: `brigit-{command}-{timestamp}.log`
-- Issue lists: `repos-{timestamp}.txt`
+- Issue lists: `brigit-scan-{timestamp}.repos`
 - User config: `repos-ignore.txt`, `ghbranchprotection.json`
 
 ### Output Format

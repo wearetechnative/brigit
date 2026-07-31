@@ -7,9 +7,13 @@
   - New default location: `${XDG_STATE_HOME:-~/.local/state}/brigit/` (XDG-compliant)
   - Override precedence: `-O <dir>` flag > `BRIGIT_OUTPUT_DIR` env var > `output_dir` in `~/.config/brigit/config` > XDG default
   - `scan` and `enforce` now print the absolute path of every file they create
+- **Uniform output file naming**: all generated files follow the grammar `brigit-<command>-<timestamp>.<ext>`
+  - `.log` = human-readable report, `.repos` = machine-readable `org:repo` list
+  - Both `scan` artifacts share the `brigit-scan-<timestamp>` prefix and sort adjacently
 
 ### Changed
-- **BREAKING**: `scan` and `enforce` no longer write `brigit-scan-*.log`, `brigit-enforce-*.log`, or `repos-*.txt` to the current working directory. Automation reading these from the CWD must be updated (or set `BRIGIT_OUTPUT_DIR=$PWD` to restore the old behavior).
+- **BREAKING**: the scan issue list is now named `brigit-scan-<timestamp>.repos` (previously `repos-<timestamp>.txt`). Its `org:repo` format is unchanged and it is still valid input for `brigit enforce -f`; only the name and extension changed.
+- **BREAKING**: `scan` and `enforce` no longer write `brigit-scan-*.log`, `brigit-enforce-*.log`, or `brigit-scan-*.repos` to the current working directory. Automation reading these from the CWD must be updated (or set `BRIGIT_OUTPUT_DIR=$PWD` to restore the old behavior).
 
 ### Fixed
 - **`clean` command**: Now searches the resolved output directory instead of the script installation directory, so it works for Nix installations (previously it looked in the read-only Nix store and never found any files)

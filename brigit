@@ -206,7 +206,7 @@ scan() {
     generate_timestamp
     local SCRIPT_NAME=$(basename "$0")
     local OUTPUT_FILE="${OUTPUT_DIR}/${SCRIPT_NAME}-scan-${TIMESTAMP}.log"
-    local REPOS_OUTPUT_FILE="${OUTPUT_DIR}/repos-${TIMESTAMP}.txt"
+    local REPOS_OUTPUT_FILE="${OUTPUT_DIR}/${SCRIPT_NAME}-scan-${TIMESTAMP}.repos"
 
     # Load ignore list
     local IGNORE_FILE="$SCRIPT_DIR/repos-ignore.txt"
@@ -662,14 +662,14 @@ enforce() {
     return 0
 }
 
-make_command "clean" "Clean up log files and repos*.txt files"
+make_command "clean" "Clean up .log reports and .repos issue lists"
 clean() {
     detect_interactive
 
     # Resolve output directory (env > config > XDG default; no -O for clean)
     resolve_output_dir ""
 
-    # Find all brigit log files and repos*.txt files
+    # Find all brigit .log reports and .repos issue lists
     local files=()
     local script_name=$(basename "$0")
 
@@ -678,14 +678,14 @@ clean() {
         files+=("$file")
     done < <(find "$OUTPUT_DIR" -maxdepth 1 -name "${script_name}-*.log" -print0 2>/dev/null)
 
-    # Find repos*.txt files
+    # Find .repos issue-list files
     while IFS= read -r -d '' file; do
         files+=("$file")
-    done < <(find "$OUTPUT_DIR" -maxdepth 1 -name "repos-*.txt" -print0 2>/dev/null)
+    done < <(find "$OUTPUT_DIR" -maxdepth 1 -name "${script_name}-scan-*.repos" -print0 2>/dev/null)
 
     # Check if there are files to clean
     if [ ${#files[@]} -eq 0 ]; then
-        echo "No log files or repos*.txt files found to clean."
+        echo "No .log reports or .repos issue lists found to clean."
         return 0
     fi
 
