@@ -205,9 +205,9 @@ The enforcement builds a complete protection configuration by:
 ### Recommended Workflow
 
 1. Run `brigit scan -o myorg` first
-2. Review `repos-{timestamp}.txt` output
+2. Review `brigit-scan-{timestamp}.repos` output
 3. Edit file to remove any repos that shouldn't be modified
-4. Run `brigit enforce -f repos-{timestamp}.txt`
+4. Run `brigit enforce -f brigit-scan-{timestamp}.repos`
 5. Run `brigit scan -o myorg` again to verify
 
 ## Examples
@@ -221,11 +221,11 @@ brigit enforce -o technative-mcs -r brigit
 ```bash
 # First scan to find issues
 brigit scan -o technative-mcs
-# Output: repos-20260226_184729.txt
+# Output: brigit-scan-20260226_184729.repos
 
 # Review and edit the file if needed
 # Then enforce
-brigit enforce -f repos-20260226_184729.txt
+brigit enforce -f brigit-scan-20260226_184729.repos
 ```
 
 ### Enforce on custom list
