@@ -29,6 +29,60 @@ generate_timestamp() {
     TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 }
 
+# Resolve the directory where output/log/artifact files are written.
+# Precedence (highest first):
+#   1. flag value passed as $1 (from -O)
+#   2. $BRIGIT_OUTPUT_DIR environment variable
+#   3. output_dir=<dir> in ~/.config/brigit/config
+#   4. ${XDG_STATE_HOME:-$HOME/.local/state}/brigit
+# Sets the absolute path in the global OUTPUT_DIR and creates it if missing.
+# Usage: resolve_output_dir "$FLAG_OUTPUT_DIR"
+resolve_output_dir() {
+    local flag_dir="$1"
+    local config_file="$HOME/.config/brigit/config"
+    local dir=""
+
+    if [ -n "$flag_dir" ]; then
+        dir="$flag_dir"
+    elif [ -n "$BRIGIT_OUTPUT_DIR" ]; then
+        dir="$BRIGIT_OUTPUT_DIR"
+    elif [ -f "$config_file" ]; then
+        # Comment-tolerant key=value parse of the first output_dir setting.
+        local value
+        value=$(grep -E '^[[:space:]]*output_dir[[:space:]]*=' "$config_file" 2>/dev/null \
+            | grep -v '^[[:space:]]*#' \
+            | head -n 1 \
+            | sed -E 's/^[[:space:]]*output_dir[[:space:]]*=[[:space:]]*//' \
+            | sed -E 's/[[:space:]]*$//' \
+            | sed -E 's/^"(.*)"$/\1/' \
+            | sed -E "s/^'(.*)'\$/\1/")
+        if [ -n "$value" ]; then
+            dir="$value"
+        fi
+    fi
+
+    if [ -z "$dir" ]; then
+        dir="${XDG_STATE_HOME:-$HOME/.local/state}/brigit"
+    fi
+
+    # Expand a leading ~/ or $HOME in the value.
+    case "$dir" in
+        "~") dir="$HOME" ;;
+        "~/"*) dir="$HOME/${dir#\~/}" ;;
+        "\$HOME") dir="$HOME" ;;
+        "\$HOME/"*) dir="$HOME/${dir#\$HOME/}" ;;
+    esac
+
+    # Create the directory (including parents) or fail with a clear message.
+    if ! mkdir -p "$dir" 2>/dev/null; then
+        echo "Error: could not create output directory: $dir" >&2
+        exit 1
+    fi
+
+    # Normalize to an absolute path.
+    OUTPUT_DIR="$(cd "$dir" && pwd)"
+}
+
 # Check all prerequisites
 check_prerequisites() {
     # Check if jq is installed

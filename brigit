@@ -140,9 +140,10 @@ scan() {
     local REPOSITORY=""
     local REPOS_FILE=""
     local DEBUG=false
+    local OUTPUT_DIR_FLAG=""
 
     # Parse arguments
-    while getopts "o:r:f:dh" opt; do
+    while getopts "o:r:f:O:dh" opt; do
         case ${opt} in
             o)
                 ORGANIZATION=$OPTARG
@@ -153,24 +154,28 @@ scan() {
             f)
                 REPOS_FILE=$OPTARG
                 ;;
+            O)
+                OUTPUT_DIR_FLAG=$OPTARG
+                ;;
             d)
                 DEBUG=true
                 ;;
             h)
-                echo "Usage: brigit scan -o <organization> [-r <repository>] [-d]"
-                echo "       brigit scan -f <repos_file> [-d]"
+                echo "Usage: brigit scan -o <organization> [-r <repository>] [-O <dir>] [-d]"
+                echo "       brigit scan -f <repos_file> [-O <dir>] [-d]"
                 echo ""
                 echo "Options:"
                 echo "  -o organization  GitHub organization to scan (required without -f)"
                 echo "  -r repository    Specific repository to scan (optional, requires -o)"
                 echo "  -f repos_file    File with repositories in format org:repo (one per line)"
+                echo "  -O dir           Directory for output files (overrides config and default)"
                 echo "  -d               Enable debug mode"
                 echo "  -h               Show this help"
                 return 0
                 ;;
             \?)
-                echo "Usage: brigit scan -o <organization> [-r <repository>] [-d]"
-                echo "       brigit scan -f <repos_file> [-d]"
+                echo "Usage: brigit scan -o <organization> [-r <repository>] [-O <dir>] [-d]"
+                echo "       brigit scan -f <repos_file> [-O <dir>] [-d]"
                 return 1
                 ;;
         esac
@@ -194,11 +199,14 @@ scan() {
         return 1
     fi
 
+    # Resolve output directory (flag > env > config > XDG default)
+    resolve_output_dir "$OUTPUT_DIR_FLAG"
+
     # Generate timestamp for output files
     generate_timestamp
     local SCRIPT_NAME=$(basename "$0")
-    local OUTPUT_FILE="${SCRIPT_NAME}-scan-${TIMESTAMP}.log"
-    local REPOS_OUTPUT_FILE="repos-${TIMESTAMP}.txt"
+    local OUTPUT_FILE="${OUTPUT_DIR}/${SCRIPT_NAME}-scan-${TIMESTAMP}.log"
+    local REPOS_OUTPUT_FILE="${OUTPUT_DIR}/repos-${TIMESTAMP}.txt"
 
     # Load ignore list
     local IGNORE_FILE="$SCRIPT_DIR/repos-ignore.txt"
@@ -416,6 +424,7 @@ enforce() {
     local ORGANIZATION=""
     local REPOSITORY=""
     local REPOS_FILE=""
+    local OUTPUT_DIR_FLAG=""
 
     # Config file location: check user config first, then system default
     local CONFIG_FILE=""
@@ -426,7 +435,7 @@ enforce() {
     fi
 
     # Parse arguments
-    while getopts "o:r:f:h" opt; do
+    while getopts "o:r:f:O:h" opt; do
         case ${opt} in
             o)
                 ORGANIZATION=$OPTARG
@@ -437,19 +446,23 @@ enforce() {
             f)
                 REPOS_FILE=$OPTARG
                 ;;
+            O)
+                OUTPUT_DIR_FLAG=$OPTARG
+                ;;
             h)
-                echo "Usage: brigit enforce -o <organization> -r <repository>"
-                echo "       brigit enforce -f <repos_file>"
+                echo "Usage: brigit enforce -o <organization> -r <repository> [-O <dir>]"
+                echo "       brigit enforce -f <repos_file> [-O <dir>]"
                 echo ""
                 echo "Options:"
                 echo "  -o organization  GitHub organization name"
                 echo "  -r repository    Repository name (requires -o)"
                 echo "  -f repos_file    File with repositories in format org:repo (one per line)"
+                echo "  -O dir           Directory for output files (overrides config and default)"
                 echo "  -h               Show this help"
                 return 0
                 ;;
             \?)
-                echo "Usage: brigit enforce -o <organization> -r <repository>"
+                echo "Usage: brigit enforce -o <organization> -r <repository> [-O <dir>]"
                 return 1
                 ;;
         esac
@@ -461,10 +474,13 @@ enforce() {
         return 1
     fi
 
+    # Resolve output directory (flag > env > config > XDG default)
+    resolve_output_dir "$OUTPUT_DIR_FLAG"
+
     # Generate timestamp
     generate_timestamp
     local SCRIPT_NAME=$(basename "$0")
-    local OUTPUT_FILE="${SCRIPT_NAME}-enforce-${TIMESTAMP}.log"
+    local OUTPUT_FILE="${OUTPUT_DIR}/${SCRIPT_NAME}-enforce-${TIMESTAMP}.log"
 
     # Load ignore list
     local IGNORE_FILE="$SCRIPT_DIR/repos-ignore.txt"
@@ -650,6 +666,9 @@ make_command "clean" "Clean up log files and repos*.txt files"
 clean() {
     detect_interactive
 
+    # Resolve output directory (env > config > XDG default; no -O for clean)
+    resolve_output_dir ""
+
     # Find all brigit log files and repos*.txt files
     local files=()
     local script_name=$(basename "$0")
@@ -657,12 +676,12 @@ clean() {
     # Find log files
     while IFS= read -r -d '' file; do
         files+=("$file")
-    done < <(find "$SCRIPT_DIR" -maxdepth 1 -name "${script_name}-*.log" -print0 2>/dev/null)
+    done < <(find "$OUTPUT_DIR" -maxdepth 1 -name "${script_name}-*.log" -print0 2>/dev/null)
 
     # Find repos*.txt files
     while IFS= read -r -d '' file; do
         files+=("$file")
-    done < <(find "$SCRIPT_DIR" -maxdepth 1 -name "repos-*.txt" -print0 2>/dev/null)
+    done < <(find "$OUTPUT_DIR" -maxdepth 1 -name "repos-*.txt" -print0 2>/dev/null)
 
     # Check if there are files to clean
     if [ ${#files[@]} -eq 0 ]; then
