@@ -132,6 +132,25 @@ brigit v${VERSION_NUM}
 EOF
 }
 
+make_command "docs" "Show the README documentation"
+docs() {
+    detect_interactive
+
+    local readme="$SCRIPT_DIR/README.md"
+    if [ ! -f "$readme" ]; then
+        echo "Error: documentation file not found at '$readme'" >&2
+        return 1
+    fi
+
+    if $INTERACTIVE; then
+        # Render markdown and page it so the full README is scrollable.
+        gum format < "$readme" | gum pager
+    else
+        # Plain output keeps the command composable in pipes.
+        cat "$readme"
+    fi
+}
+
 make_command "scan" "Scan repositories (requires: -o or -f)"
 scan() {
     prelude

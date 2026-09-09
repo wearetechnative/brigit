@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **`brigit docs` command**: prints the README documentation from the terminal — rendered and scrollable in an interactive terminal, or plain text when piped. The README now ships with Nix installs so `brigit docs` works regardless of how brigit was installed.
+
 ## [0.0.5] - 2026-07-31
 
 ### Added

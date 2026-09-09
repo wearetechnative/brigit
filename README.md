@@ -172,6 +172,9 @@ cd brigit
 # Show help
 brigit
 
+# Show this documentation (README)
+brigit docs
+
 # Scan repositories for branch protection compliance
 brigit scan -o <organization>                    # All repos in org
 brigit scan -o <organization> -r <repository>    # Specific repo

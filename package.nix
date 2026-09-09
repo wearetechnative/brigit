@@ -33,6 +33,9 @@ stdenv.mkDerivation rec {
     # Install VERSION file
     cp VERSION $out/share/brigit/VERSION
 
+    # Install README so `brigit docs` works on Nix installs
+    cp README.md $out/share/brigit/README.md
+
     # Install configuration
     cp ghbranchprotection.json $out/share/brigit/ghbranchprotection.json
 
