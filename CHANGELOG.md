@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-09
+
 ### Added
 - **`brigit docs` command**: prints the README documentation from the terminal — rendered and scrollable in an interactive terminal, or plain text when piped. The README now ships with Nix installs so `brigit docs` works regardless of how brigit was installed.
 
@@ -79,3 +81,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.0.1]: https://github.com/wearetechnative/brigit/releases/tag/v0.0.1
 [0.0.5]: https://github.com/wearetechnative/brigit/releases/tag/v0.0.5
+[0.1.0]: https://github.com/wearetechnative/brigit/releases/tag/v0.1.0
